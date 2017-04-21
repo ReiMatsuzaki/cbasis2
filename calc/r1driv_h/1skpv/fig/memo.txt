@@ -1,0 +1,1 @@
+graphics are from 2017/4/plot_fitted.ipynb

@@ -1,0 +1,28 @@
+{
+    "comment": "test for one cSTO",
+    "mode": "calc",
+    "opts": {"write_matrix": "f",
+	     "czs_out": "out/czs.csv",
+	     "psi_out": "out/psi.csv",
+	     "ac_out": "out/ac.csv",
+	     "cs_out": "out/cs.csv"
+	    },
+    "method": {"inner_product": "complex",
+	       "dt": 0.1,
+	       "t1": 100.0,
+	       "time_step": "RK4"},
+    "target": {"type": "custom",
+	       "psi0": {"type":  "basis"},
+	       "E0": -0.5,
+	       "pot": {"type": "hatom",
+		       "Z": 1.0,
+		       "L": 1
+		      }	       
+	      },
+    "basis": {"type": "STO",
+	      "opts": {"include_normalization_const": "t"},
+	      "value": [
+		  {"c": 2.0, "n": 2, "z": 1.0, "opt": "t"}
+	      ]
+	     }
+}

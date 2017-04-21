@@ -1,0 +1,32 @@
+{
+    "comment" : "one electron calculation for initial guess of RHF",
+    "out_json": "one_eig.out.json",
+    "out_eigvals": "one_eigvals.bin",
+    "out_eigvecs": "one_eigvecs.bin",
+    "sym": "D2h",
+    "molecule": [
+	{"atom": "H",   "q": 0.5, "xyz": [[0,0,0.7]]},
+	{"atom": "Cen", "q": 0.0, "xyz": [[0,0,0]]}],
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "atom":  "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [1]]}],
+	 "zeta": [
+	     33.87,
+	     5.095,
+	     1.159,
+	     0.3258,
+	     0.1027,
+	     0.02526]},
+	{"type": "full",
+	 "ns":   [[0,0,1]],
+	 "atom":  "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [-1]]}],
+	 "zeta": [ 1.407, 0.388, 0.102]}
+    ]    
+}
+
+
+
+

@@ -1,0 +1,16 @@
+{
+    "comment" : "calculation of H atom bound state for initial guess of He",
+    "out_json": "he_one.out.json",
+    "out_eigvals": "one_eigvals.bin",
+    "out_eigvecs": "one_eigvecs.bin",
+    "sym": "C1",
+    "molecule": [
+	{"atom": "He", "q": 2.0, "xyz": [[0,0,0]]}],
+    "basis": [
+	{"type": "solid_sh",
+	 "atom":  "He",
+	 "L": 0, "Ms": [0],
+	 "zeta":[
+	     0.0016384, 0.004096, 0.01024, 0.0256, 0.064, 0.16, 0.4,
+	     1.0, 2.5, 6.25, 15.625, 39.0625, 97.6562, 244.141]}]
+}

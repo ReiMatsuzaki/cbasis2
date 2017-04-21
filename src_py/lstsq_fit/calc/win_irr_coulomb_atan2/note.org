@@ -1,0 +1,22 @@
+* first
+[2016-09-21 Wed]
+計算条件とかを整理した。
+
+* num_gto
+  num_gto = 5
+  で計算してきたが、num_gto = 4としてもあまり精度は変わらないようにみえる。
+  しかし、まったく変化しないわけではない。
+
+* x1
+  x1 = 7,9
+  あたりが最も遠方までfittingできている。
+  x1 = 5は少し性能が悪いか。
+  see p_ene05/fig/r0_30_psi.png
+
+* r0 (localtion of window)
+  r0 = 30 が一番綺麗に計算できている。
+  see p_ene05/fig/r0_30_psi.png
+  
+* for presentation
+  x0_5_r0_30_re_im.png
+  

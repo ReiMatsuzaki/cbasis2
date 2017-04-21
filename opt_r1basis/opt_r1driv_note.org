@@ -1,0 +1,22 @@
+* grad
+  C = GS
+  alpha = (R, C)
+
+  C_i = -G D_i G S + G S_i
+  .   = -G D_i C + G S_i
+
+  C_ij = G D_j G D_i C - G D_ij C - G D_i C_j
+  .      -G D_j G S_i + G S_ij
+
+  alpha_i  = R_i C + (R, C_i)
+  alpha_ij = R_ij C + R_i C_j + R_j C_i + R C_ij
+
+* numerical derivative
+
+  .     f(x+e) - f(x-e)
+  fi = -----------------
+  .           2e
+
+  .      f(x+ei+ej) - f(x+ei-ej) - f(x-ei+ej) + f(-ei-ej)
+  fij = --------------------------------------------------
+  .           4ee

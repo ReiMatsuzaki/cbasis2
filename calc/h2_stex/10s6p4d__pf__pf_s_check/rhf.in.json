@@ -1,0 +1,31 @@
+{
+    "comment" : "RHF calculation of  H2",
+    "out_json": "out.json",
+    "out_eigvals": "eigvals.bin",
+    "out_eigvecs": "eigvecs.bin",
+    "eri_method" : {"symmetry": 1, "memo": 1, "perm": 1},
+    "num_ele": 2,
+    "max_iter": 50,
+    "tol": 0.000001,
+    "sym": "D2h",
+    "molecule": [
+	{"atom": "H",   "q": 1.0, "xyz": [[0,0,0.7]]},
+	{"atom": "Cen", "q": 0.0, "xyz": [[0,0,0]]}],
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "atom":  "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [1]]}],
+	 "zeta": [0.0856947, 0.2437218, 0.571611, 1.391775, 3.607554, 10.138947, 31.821600000000004, 115.95489, 520.7466, 3511.494]},
+	{"type": "full",
+	 "ns":   [[0,0,1]],
+	 "atom":  "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [-1]]}],
+	 "zeta": [0.046326, 0.106956, 0.257028, 0.683289, 2.130384, 9.029133]},
+	{"type": "full",
+	 "ns":   [[0,0,2]],
+	 "atom":  "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [1]]}],
+	 "zeta": [15.0, 5.0, 1.66666666, 0.5555555555]}	
+    ]
+}

@@ -1,0 +1,16 @@
+{
+    "comment" : "calculation of H2+ bound state using small basis",
+    "out_json": "out.json",
+    "out_eigvals": "eigvals.bin",
+    "out_eigvecs": "eigvecs.bin",
+    "sym": "D2h",
+    "molecule": [
+	{"atom": "H",   "q": 1.0, "xyz": [[0,0,1.0]]},
+	{"atom": "Cen", "q": 0.0, "xyz": [[0,0,0]]}],    
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "atom" : "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [1]]}],
+	 "zeta": [0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]}]
+}

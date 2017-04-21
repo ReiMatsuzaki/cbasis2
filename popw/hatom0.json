@@ -1,0 +1,12 @@
+{
+    "comment" : "calculation of H atom bound state",
+    "out_json": "out.json",
+    "out_eigvals": "eigvals.bin",
+    "out_eigvecs": "eigvecs.bin",
+    "sym": "Cs",
+    "molecule": [{"atom": "H", "q": 1.0, "xyz": [[0,0,0]]}],
+    "basis": [ {"type": "solid_sh", "atom": "H", "L": 0, "Ms": [0],
+		"zeta":[0.0016384, 0.004096, 0.01024, 0.0256, 0.064,
+			0.16, 0.4, 1.0, 2.5, 6.25, 15.625, 39.0625, 97.6562, 244.141],
+		"comment": "Huzinaga 10s-GTO"}]
+}

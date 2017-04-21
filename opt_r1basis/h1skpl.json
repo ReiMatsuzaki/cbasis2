@@ -1,0 +1,21 @@
+{
+    "comment": "test for hydrogen photoionization 1s->kp channel, length form. basis are optimized cSTO set. Reference value of alpha is (5.65688402161-1.08811622008j)",
+    "mode": "run",
+    "opts": {"write_matrix": true},
+    "method": {"max_iter": 20, "eps": 0.0000001},
+    "basis": {"type": "STO",
+	      "value": [
+		  {"n": 2, "z": [0.99657, -0.0137]},
+		  {"n": 2, "z": [1.00303, -0.68367]},
+		  {"n": 2, "z": [0.334629, -1.09526]}
+	      ]
+	     },
+    "target": {"type": "custom",
+	       "driv": {"type":  "STO",
+			"value": [{"c":2.0, "n":2, "z":1.0}]
+		       },
+	       "E": 0.5,
+	       "Z": 1.0,
+	       "L": 1
+	      }    
+}

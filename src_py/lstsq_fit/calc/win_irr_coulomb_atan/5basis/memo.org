@@ -1,0 +1,3 @@
+ノートが
+project/gto_paper/main*.org
+にある。

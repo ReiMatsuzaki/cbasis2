@@ -1,0 +1,17 @@
+{
+    "comment" : "calculation of H atom bound state",
+    "out_json": "out.json",
+    "out_eigvals": "eigvals.bin",
+    "out_eigvecs": "eigvecs.bin",
+    "sym": "C1",
+    "molecule": [
+	{"name": "H", "xyz": [0.0,0.0,0.0], "q": 1.0}
+    ],
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "xyz":  [[0,0,0.0]],
+	 "rds":  [{"irrep": 0, "coef": [[1], [1]]}],
+	 "zeta":[0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]}
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "comment": "hydrogen photoionization 1s->kp channel with length form. basis are optimized three cSTO set. Reference value of alpha is (5.65688402161-1.08811622008j)",
+    "opts": {"write_matrix": true},
+    "write_psi": {"file": "psi.csv",
+		  "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },
+    "write_basis": {"file": "basis.csv",
+		    "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },    
+    "target": {"type": "custom",
+	       "driv": {"type":  "STO",
+			"value": [{"c":2.0, "n":2, "z":1.0}]
+		       },
+	       "E": 0.5,
+	       "Z": 1.0,
+	       "L": 1
+	      },
+    "basis": {"type": "STO",
+	      "value": [
+		  {"n": 2, "z": [0.9659358492, -0.4152156194]}
+	      ]}
+}
+
+
+

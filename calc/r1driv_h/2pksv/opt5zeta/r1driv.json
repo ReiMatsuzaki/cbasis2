@@ -1,0 +1,30 @@
+{
+    "comment": "hydrogen photoionization 2p->ks channel with velocity form. basis are optimized five cSTO set.",
+    "write_psi": {"file": "psi.csv",
+		  "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },
+    "write_basis": {"file": "basis.csv",
+		    "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },
+    "target": {"type": "custom",
+	       "driv": {"type":  "STO",
+			"value": [
+			    {"c":0.612372435696,  "n":1, "z":0.5},
+			    {"c":-0.102062072616, "n":2, "z":0.5}
+			]
+		       },
+	       "E": 0.5,
+	       "Z": 1.0,
+	       "L": 0
+	      },
+    "basis": {"type": "STO",
+	      "value": [
+		  {"n": 2, "z": [0.5010396211, -0.0035434968]},
+		  {"n": 1, "z": [0.4697102618, -0.0213188096]},
+		  {"n": 1, "z": [0.6249543224, -0.4228972010]},
+		  {"n": 1, "z": [0.4640583890, -0.8860940977]},
+		  {"n": 1, "z": [0.1097095957, -1.0684264662]}
+	      ]
+	     }
+}
+
+
+

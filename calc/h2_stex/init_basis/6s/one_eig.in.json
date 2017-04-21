@@ -1,0 +1,20 @@
+{
+    "comment" : "6s-GTO. Huzinaga(1965)",
+    "out_json": "one_eig.out.json",
+    "out_eigvals": "one_eigvals.bin",
+    "out_eigvecs": "one_eigvecs.bin",
+    "sym": "D2h",
+    "molecule": [
+	{"atom": "H",   "q": 0.5, "xyz": [[0,0,0.7]]},
+	{"atom": "Cen", "q": 0.0, "xyz": [[0,0,0]]}],
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "atom":  "H",
+	 "rds":  [{"irrep": "Ag", "coef": [[1], [1]]}],
+	 "zeta": [0.082217, 0.224660, 0.673320, 2.34648, 10.2465, 68.1600]}
+    ]
+}
+
+
+

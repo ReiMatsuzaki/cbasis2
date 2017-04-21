@@ -1,0 +1,1 @@
+LIBS=${HOME}/local/lib

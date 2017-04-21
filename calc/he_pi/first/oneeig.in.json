@@ -1,0 +1,21 @@
+{
+    "comment": "initial guess for RHF calculation of He",
+    "out_json": "h2_oneeig.out.json",
+    "out_eigvals": "one_eigvals.bin",
+    "out_eigvecs": "one_eigvecs.bin",
+    "sym": "D2h",
+    "molecule": [ { "atom": "He",
+		    "q": 2.0,
+		    "xyz": [[0,0,0]]	    	
+		  } ],		
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "atom":  "He",
+	 "rds":  [ {"irrep": "Ag", "coef": [[1]]} ],
+	 "zeta": [
+	     0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053, 30.17990, 108,7723, 488.8941, 3293.694]
+	}
+    ]
+}
+

@@ -1,0 +1,2 @@
+Check the accuracy of STO-NG expansition by seeing plot of STO and STO-NG.
+Plots are in Note/daily/2017/1/*.ipynb

@@ -1,0 +1,28 @@
+{
+    "comment": "hydrogen photoionization 3d->kf channel with velocity form. basis are optimized five cSTO set. To produce driven term, lanch command 'from numpy import sqrt; -2.0/243*sqrt(2.0/15.0)'",
+    "write_psi": {"file": "psi.csv",
+		  "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },
+    "write_basis": {"file": "basis.csv",
+		    "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },
+    "target": {"type": "custom",
+	       "driv": {"type":  "STO",
+			"value": [
+			    {"c":-0.00300533639235,  "n":3, "z":0.33333333333333}
+			]
+		       },
+	       "E": 0.5,
+	       "Z": 1.0,
+	       "L": 3
+	      },
+    "basis": {"type": "STO",
+	      "value": [
+		  {"n": 4, "z": [0.3486100082,  -0.0137756583]},
+		  {"n": 4, "z": [0.4124025071,  -0.0824062238]},
+		  {"n": 4, "z": [0.5083269685,  -0.2484388703]},
+		  {"n": 4, "z": [0.5433801910,  -0.5596349925]},
+		  {"n": 4, "z": [0.3572314751,  -0.9050673724]}
+	      ]
+}
+
+
+

@@ -1,0 +1,8 @@
+{
+    "comment": "test for hydrogen photoionization 1s->kp channel, length form",
+    "basis": {"type": "STO"
+	     },
+    "target": {"type": "h_pi",
+	       "channel": "1s->kp",
+	       "dipole":  "length"}
+}

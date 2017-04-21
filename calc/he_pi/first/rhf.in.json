@@ -1,0 +1,24 @@
+{
+    "comment" : "RHF calculation of  He. Basis functions is uncontracted Huzinaga's STO-10G",
+    "out_json": "rhf.out.json",
+    "in_eigvals": "one_eigvals.bin",
+    "in_eigvecs": "one_eigvecs.bin",    
+    "out_eigvals": "eigvals.bin",
+    "out_eigvecs": "eigvecs.bin",
+    "eri_method" : {"symmetry": 1, "memo": 1, "perm": 1},
+    "num_ele": 2,
+    "scf_opts": {"max_iter": 50, "tol": 0.00002, "use_real": true},
+    "sym": "D2h",
+    "molecule": [
+	{"atom": "He",   "q": 2.0, "xyz": [[0,0,0]]}
+    ],
+    "basis": [
+	{"type": "full",
+	 "ns":   [[0,0,0]],
+	 "atom":  "He",
+	 "rds":  [ {"irrep": "Ag", "coef": [[1]]} ],
+	 "zeta": [
+	     0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053, 30.17990, 108,7723, 488.8941, 3293.694]
+	}
+    ]
+}

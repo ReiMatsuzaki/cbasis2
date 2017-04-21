@@ -1,0 +1,18 @@
+{
+    "comment": "check sto-NG expansion. From ~/calc/sto-ng/least_square_integrate/2p/analytic_trust_4prec/sto10g/70_89. arg[zeta]=70.1deg",
+    "write_basis": {"file": "basis_sto.csv",
+		    "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 1001} },
+    "target": {"type": "custom",
+	       "driv": {"type":  "STO",
+			"value": [{"c":2.0, "n":2, "z":1.0}]
+		       },
+	       "E": 0.5,
+	       "Z": 1.0,
+	       "L": 1
+	      },
+    "basis": {"type": "STO",
+	      "value": [
+		  {"n": 2, "z": [0.34037955021305033, -0.9402881270104189]}
+	      ]}
+}
+		  
