@@ -25,6 +25,7 @@ namespace cbasis {
     BMat Y, Z;
     // -- routines --
   public:
+    CalcRPA();
     CalcRPA(std::string name);
     void CalcH();
     void CalcH_HF(const BMat& H_IVO_AO, dcomplex eig0_HF,	    

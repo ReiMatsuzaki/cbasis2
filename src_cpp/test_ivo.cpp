@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <boost/format.hpp>
+#include <boost/foreach.hpp>
+#include <boost/assign.hpp>
 #include "../utils/eigen_plus.hpp"
 #include "../utils/gtest_plus.hpp"
 #include "../utils/typedef.hpp"
@@ -12,6 +14,7 @@ using namespace std;
 using namespace cbasis;
 using namespace Eigen;
 using boost::format;
+using namespace boost::assign;
 
 class TestIVO : public ::testing::Test {
 public:  
@@ -64,6 +67,8 @@ public:
       30.17990, 108.7723;
     us_1 = NewSymGTOs(mole);
     us_1->NewSub("He").SolidSH_M(1, 0, zs);
+    us_1->NewSub("He").SolidSH_M(1, -1, zs);
+    us_1->NewSub("He").SolidSH_M(1, +1, zs);
     us_1->SetUp();
 
   }
@@ -112,8 +117,8 @@ public:
   }
 };
 TEST_F(TestIVO, Delta_E) {
-  int n = us_1->size_basis();
   Irrep irr1 = us_1->sym_group()->irrep_z();
+  int n = us_1->size_basis_isym(irr1);  
   cout << "E0 = " << mo_0->eigs(0)(0).real() << endl;
   cout << "Delta E" << endl;
   for(int I = 0; I < n; I++) {
@@ -156,7 +161,7 @@ TEST_F(TestIVO, Moment) {
   RPA_IVO.CalcOneInt(z_IVO, &z_RPA_IVO, true);
 
   // -- print out --  
-  int n = us_1->size_basis();
+  int n = us_1->size_basis_isym(irr1);
   for(int I = 0; I < n; I++) {
     cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
       % z_HF(irr1)(I).real()
@@ -189,7 +194,77 @@ TEST_F(TestIVO, Moment) {
     % acc_RPA_IVO.real();
 
 }
+TEST_F(TestIVO, Moment2) {
+  
+  // -- AO basis dipole matrix element --
+  BMat x,y,z("z"),dx,dy,dz;
+  CalcDipMat(us_1, us_0, &x, &y, &z, &dx, &dy, &dz);
+  BVec vecl, vecv;
+  Irrep irrx = us_1->sym_group()->irrep_x();
+  Irrep irry = us_1->sym_group()->irrep_y();
+  Irrep irrz = us_1->sym_group()->irrep_z();
+  vecl(irrx) = x(irrx,0) * c0;
+  vecl(irry) = y(irry,0) * c0;
+  vecl(irrz) = z(irrz,0) * c0;
+  vecv(irrx) = dx(irrx,0) * c0;
+  vecv(irry) = dy(irry,0) * c0;
+  vecv(irrz) = dz(irrz,0) * c0;  
 
+  // -- many electron --
+  BVec vecl_HF, vecv_HF;
+  BVecCtx(U_HF, vecl, &vecl_HF);
+  BVecCtx(U_HF, vecv, &vecv_HF);
+  BVec vecl_IVO, vecv_IVO;
+  BVecCtx(U_IVO, vecl, &vecl_IVO);
+  BVecCtx(U_IVO, vecv, &vecv_IVO);
+  BVec vecl_RPA_HF, vecv_RPA_HF;
+  RPA_HF.CalcOneInt(vecl_HF, &vecl_RPA_HF, true);
+  RPA_HF.CalcOneInt(vecv_HF, &vecv_RPA_HF, false);
+  BVec vecl_RPA_IVO, vecv_RPA_IVO;
+  RPA_IVO.CalcOneInt(vecl_IVO, &vecl_RPA_IVO, true);
+  RPA_IVO.CalcOneInt(vecv_IVO, &vecv_RPA_IVO, false);
+
+  // -- check sum rule --
+  vector<Irrep> irreps; irreps += irrx, irry, irrz;
+  dcomplex acc_HF(0), acc_IVO(0), acc_RPA_HF(0), acc_RPA_IVO(0);
+  dcomplex accv_HF(0), accv_IVO(0), accv_RPA_HF(0), accv_RPA_IVO(0);
+  BOOST_FOREACH(Irrep irr, irreps) {
+    int n = us_1->size_basis_isym(irr);
+    dcomplex d, w;
+    for(int I = 0; I < n; I++) {
+      d = vecl_HF(irr)(I); w = de_HF(irr)(I);      
+      acc_HF += 2.0/3.0*w*d*d;
+      d = vecl_IVO(irr)(I); w = de_IVO(irr)(I);      
+      acc_IVO += 2.0/3.0*w*d*d;
+      d = vecl_RPA_HF(irr)(I); w = RPA_HF.w(irr)(I);      
+      acc_RPA_HF += 2.0/3.0*w*d*d;
+      d = vecl_RPA_IVO(irr)(I); w = RPA_IVO.w(irr)(I);      
+      acc_RPA_IVO += 2.0/3.0*w*d*d;
+
+      d = vecv_HF(irr)(I); w = de_HF(irr)(I);      
+      accv_HF += 2.0/3.0/w*d*d;
+      d = vecv_IVO(irr)(I); w = de_IVO(irr)(I);      
+      accv_IVO += 2.0/3.0/w*d*d;
+      d = vecv_RPA_HF(irr)(I); w = RPA_HF.w(irr)(I);      
+      accv_RPA_HF += 2.0/3.0/w*d*d;
+      d = vecv_RPA_IVO(irr)(I); w = RPA_IVO.w(irr)(I);      
+      accv_RPA_IVO += 2.0/3.0/w*d*d;
+    }
+  }
+
+  // -- print out --
+  cout << "sum of oscillator strength" << endl;
+  cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+    % acc_HF.real()
+    % acc_IVO.real()
+    % acc_RPA_HF.real()
+    % acc_RPA_IVO.real();
+  cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+    % accv_HF.real()
+    % accv_IVO.real()
+    % accv_RPA_HF.real()
+    % accv_RPA_IVO.real();
+}
 int main(int argc, char **args) {
   ::testing::InitGoogleTest(&argc, args);
   return RUN_ALL_TESTS();

@@ -1,5 +1,6 @@
+include ../local.mk
 VPATH=../src_cpp ../utils ../math
-CPPFLAGS+=-Wall -fPIC
+CPPFLAGS+=-Wall -fPIC -I${INC_PATH}
 #ifeq (\$(OS),Linux)
 #PY_FLAGS=-I`python -c 'from distutils.sysconfig import *; print get_python_inc()'` -DPIC -shared -fPIC -lboost_python 
 

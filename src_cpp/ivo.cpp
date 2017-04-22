@@ -40,6 +40,20 @@ namespace cbasis {
     AddK(eri_K, c0, irrep0, 1.0, *H);
 
   }
+  CalcRPA::CalcRPA() {
+    A.set_name("A");
+    B.set_name("B");
+    ApB.set_name("A-B");
+    AmB.set_name("A+B");
+    sqrt_AmB.set_name("(A-B)^(1/2)");
+    inv_sqrt_AmB.set_name("(A-B)^(-1/2)");
+    H.set_name("H");
+    U.set_name("U");
+    w2.set_name("w2");
+    w.set_name("w");
+    Y.set_name("Y");
+    Z.set_name("Z");
+  }
   CalcRPA::CalcRPA(std::string name) {
     A.set_name(name+"_A");
     B.set_name(name+"_B");

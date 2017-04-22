@@ -1,3 +1,4 @@
+include local.mk
 VPATH=../src_cpp ../utils ../math
 CPPFLAGS+=-Wall -fPIC
 #ifeq (\$(OS),Linux)
@@ -6,10 +7,10 @@ CPPFLAGS+=-Wall -fPIC
 ## ==== build options ====
 ARCH=fast
 ifeq (${ARCH}, fast)
-  CXXFLAGS+= -O3 -DARG_NO_CHECK -DEIGEN_NO_DEBUG
+  CXXFLAGS+=-I${INC_PATH} -O3 -DARG_NO_CHECK -DEIGEN_NO_DEBUG
 endif
 ifeq (${ARCH},debug)
-  CXXFLAGS=${INC_PATH} -Wall
+  CXXFLAGS=-I${INC_PATH} -Wall
 endif
 
 ## ==== build directory ====
@@ -27,7 +28,7 @@ ${BINDIR}/%.o: %.cpp
 	${CXX} -c -o $@ -MMD ${CPPFLAGS} ${CXXFLAGS} $<
 
 ## ==== MAIN ====
-OBJS=two_pot.o read_json.o symmol_read_json.o symmolint.o molecule.o one_int.o two_int.o symgroup.o bmatset.o angmoment.o eigen_plus.o cfunc.o mol_func.o b2eint.o fact.o erfc.o int_exp.o timestamp.o two_int.o mo.o
+OBJS=two_pot.o read_json.o symmol_read_json.o symmolint.o molecule.o one_int.o two_int.o symgroup.o bmatset.o angmoment.o eigen_plus.o cfunc.o mol_func.o b2eint.o fact.o erfc.o int_exp.o timestamp.o two_int.o mo.o ivo.o
 ${BINDIR}/two_pot: $(foreach o, ${OBJS}, ${BINDIR}/$o)
 	${CXX} -o $@ $^ ${CXXFLAGS} ${LIBS} -lgsl -lgslcblas
 check_h2plus: ${BINDIR}/two_pot

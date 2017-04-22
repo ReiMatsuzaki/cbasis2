@@ -17,6 +17,7 @@
 #include "../src_cpp/one_int.hpp"
 #include "../src_cpp/two_int.hpp"
 #include "../src_cpp/symmol_read_json.hpp"
+#include "../src_cpp/ivo.hpp"
 
 using namespace std;
 using namespace Eigen;
@@ -482,9 +483,10 @@ void CalcMat() {
 void CalcMatSTEX() {
   PrintTimeStamp("MatSTEX_1", NULL);
 
-  //B2EInt eri_J_11 = CalcERI(basis1, basis1, basis0, basis0, eri_method);
-  //B2EInt eri_K_11 = CalcERI(basis1, basis0, basis0, basis1, eri_method);
-  //AddJ(eri_J_11, c0, irrep0, 1.0, V1); AddK(eri_K_11, c0, irrep0, 1.0, V1);
+  B2EInt eri_J_11 = CalcERI(basis1, basis1, basis0, basis0, eri_method);
+  B2EInt eri_K_11 = CalcERI(basis1, basis0, basis0, basis1, eri_method);
+  AddJ(eri_J_11, c0, irrep0, 1.0, V1);
+  AddK(eri_K_11, c0, irrep0, 1.0, V1);
 
   /*
   BMat H_STEX;
@@ -502,8 +504,10 @@ void CalcMatSTEX() {
     B2EInt eri_JH = CalcERI(c_psi0, basis1, basis0, basis0, eri_method);
     B2EInt eri_KC = CalcERI(psi0,   basis0, basis0, basis1, eri_method);
     B2EInt eri_KH = CalcERI(c_psi0, basis0, basis0, basis1, eri_method);
-    AddJ(eri_JC, c0, irrep0, 1.0, V0L1[L]);  AddK(eri_KC, c0, irrep0, 1.0, V0L1[L]);
-    AddJ(eri_JH, c0, irrep0, 1.0, HV0L1[L]); AddK(eri_KH, c0, irrep0, 1.0, HV0L1[L]);
+    AddJ(eri_JC, c0, irrep0, 1.0, V0L1[L]);
+    AddK(eri_KC, c0, irrep0, 1.0, V0L1[L]);
+    AddJ(eri_JH, c0, irrep0, 1.0, HV0L1[L]);
+    AddK(eri_KH, c0, irrep0, 1.0, HV0L1[L]);
   }
 }
 void CalcMatRPA() {
@@ -982,8 +986,8 @@ void Calc_one_lin() {
   
   for(int iw = 0; iw < (int)w_list.size(); iw++) {
     PrintTimeStamp("CalcDriv(linear_solve)", NULL);
-    double w = w_list[iw];    
-    dcomplex ene = E0 + w;
+    //    double w = w_list[iw];    
+    //    dcomplex ene = E0 + w;
 
     CalcDriv_linear_solve(iw);
     CalcMain_alpha(iw);    
@@ -1263,7 +1267,7 @@ void Calc_RPA_Eigen_HF() {
   CalcSTVMat(basis1, basis1, &S1, &T1, &V1);
   B2EInt eri_J_11 = CalcERI(basis1, basis1, basis0, basis0, eri_method);
   B2EInt eri_K_11 = CalcERI(basis1, basis0, basis0, basis1, eri_method);
-  BMat K1; Copy(S1, K1); K.SetZero();
+  BMat K1; Copy(S1, K1); K1.SetZero();
   AddK(eri_K_11, c0, 0, 1.0, K1);
   BMat H_IVO_1;
   CalcSTEXHamiltonian(T1, V1, 0, c0, eri_J_11, eri_K_11, &H_IVO_1);
@@ -1276,17 +1280,58 @@ void Calc_RPA_Eigen_HF() {
   BMatEigenSolve(H_HF_1, S1, &U_HF_1, &eig_HF_1);
   
   // -- RPA --
-  RPA rpa;
-  rpa.CalcH_HF(H_IVO_1, E0, K, eig_HF_1, U_HF_1);
+  CalcRPA rpa("");
+  rpa.CalcH_HF(H_IVO_1, E0, K1, eig_HF_1, U_HF_1);
   rpa.SolveEigen();
    
-  // -- dipole --
+  // -- dipole (AO,HF0) --
+  Irrep x = sym->irrep_x();
+  Irrep y = sym->irrep_y();
+  Irrep z = sym->irrep_z();
   BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i;
   CalcDipMat(basis1, basis0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
   s1(x) = X1i(x, 0) * c0; sD1(x) = DX1i(x, 0) * c0; 
   s1(y) = Y1i(y, 0) * c0; sD1(y) = DY1i(y, 0) * c0; 
   s1(z) = Z1i(z, 0) * c0; sD1(z) = DZ1i(z, 0) * c0;  
+
+  // -- dipole (HF, HF0) --
+  BVec s1_HF, sD1_HF;
+  BVecCtx(U_HF_1, s1,  &s1_HF);
+  BVecCtx(U_HF_1, sD1, &sD1_HF);
+
+  // --dipole (RPA) --
+  BVec s1_RPA, sD1_RPA;
+  rpa.CalcOneInt(s1_HF,  &s1_RPA, true);
+  rpa.CalcOneInt(sD1_HF, &sD1_RPA, false);
   
+  // -- total cross sections --
+  for(int iw = 0; iw < (int)w_list.size(); iw++) {
+    double w = w_list[iw];
+    cout << "w_eV: " << w * au2ev << endl;
+    cout << "w_au: " << w << endl;
+    cout << "E_eV: " << (w + E0) * au2ev << endl;
+    cout << "E_au: " << w + E0 << endl;
+    cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
+
+    // -- calculate alpha --
+    // <mu phi0, psi1> = sum_I d_I d_I/(w-dEI)
+    // d_I = <I|mu|0>
+    BOOST_FOREACH(Irrep i, irreps) {
+      muphi_psi1[i] = 0.0;
+      muphi_psi1_v[i] = 0.0;
+      int n = basis1->size_basis_isym(i);
+      for(int I = 0; I < n; I++) {
+	dcomplex dl = s1_RPA( i)(I);
+	dcomplex dv = sD1_RPA(i)(I);
+	dcomplex wi = rpa.w(i)(I);
+	muphi_psi1[i]   += dl*dl/(w-wi);
+	muphi_psi1_v[i] += dv*dv/(w-wi);
+      } 
+    }
+    
+    CalcMain_alpha(iw);    
+    //    CalcMain(iw);
+  } 
   
 }
 int main(int argc, char *argv[]) {
@@ -1300,7 +1345,7 @@ int main(int argc, char *argv[]) {
   PrintIn();
 
   if(calc_type == "RPA" and solve_driv_type == "eigen_value") {
-    Calc_RPA_Eigen_IVO();
+    Calc_RPA_Eigen_HF();
     return 0;
   }
 
@@ -1330,8 +1375,6 @@ int main(int argc, char *argv[]) {
     CalcMain_alpha(iw);    
     CalcMain(iw);
   }
-
- out:
   
   PrintOut();
   cout << "<<<< two_pot <<<<" << endl;
