@@ -70,7 +70,7 @@ namespace cbasis {
     iterator find(Key& k) { return map_.find(k); }
     const_iterator find(const Key& k) const { return map_.find(k); }
     void set_name(std::string _name) { name_ = _name; }
-    BMat& set_simple_print() { simple_print_=true; return *this; }
+    BMat& simple_print() { simple_print_=true; return *this; }
     BMat& full_print() { simple_print_=false; return *this; }
     bool get_simple_print() const { return simple_print_;}
     std::string get_name() const { return name_; }
@@ -100,8 +100,7 @@ namespace cbasis {
     void swap(BMat& o);
     void Write(std::string filename) const;
     void Read(std::string filename);
-    
-    
+    void SimplePrint() const;
   };
   std::ostream& operator << (std::ostream& os, const BMat& a);
   void Copy(const BMat& a, BMat& b);
@@ -112,8 +111,10 @@ namespace cbasis {
   void BMatSqrt(const BMat& a, BMat& b);
   void BMatCtAC(const BMat& C, const BMat& A, BMat *res);
   void BMatCtAD(const BMat& C, const BMat& D, const BMat& A, BMat *res);
+  void BMatCtA(const BMat& C, const BMat& A, BMat *res);
   void BMatEigenSolve(const BMat& H, const BMat& S, BMat *C, BVec *E);
   void BMatEigenSolve(const BMat& H, BMat *C, BVec *E);
+  
   // ==== Old ====
   void BMatRead(BMat::Map& bmat, std::string fn);
   void BMatWrite(BMat::Map& bmat, std::string fn);

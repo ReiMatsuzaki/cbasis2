@@ -231,7 +231,6 @@ namespace cbasis {
   void BMat::Scale(dcomplex c) {
     
     for(iterator it = this->begin(); it != this->end(); ++it) {	
-      Key k = it->first;
       MatrixXcd& m = it->second;
       m = c * m;
     }
@@ -295,6 +294,21 @@ namespace cbasis {
     }
 
     return true;
+  }
+  void BMat::SimplePrint() const {
+    cout << "==== BMat ====" << endl;
+    cout << "Block matrix object" << endl;
+    cout << "name: " << this->get_name() << endl;
+    cout << "non0_block: " << this->size() << endl;
+    for(BMat::const_iterator it = this->begin(); it != this->end(); ++it) {
+      BMat::Key key = it->first;
+      int irrep = key.first;
+      int jrrep = key.second;
+      const MatrixXcd& mat = it->second;
+      cout << format("(irrep, jrrep; inum, jnum) = (%d, %d; %d, %d)\n")
+	% irrep % jrrep % mat.rows() % mat.cols();
+    }
+    cout << "==============" << endl;
   }
   void BMatDiag(const BVec& a, BMat *m) {
 
@@ -516,14 +530,30 @@ namespace cbasis {
     
     typedef BMat::const_iterator It;
     typedef BMat::Key Key;
-    
-    for(It it = A.begin(); it != A.end(); ++it) {
-      Key k = it->first;
-      if(not res->has_block(k)) {
-	(*res)[k] = MatrixXcd::Zero(C[k].rows(), D[k].rows());
+
+    // -- check structure and store memory --
+    for(It itc = C.begin(); itc != C.end(); ++itc) {
+      for(It itd = D.begin(); itd != D.end(); ++itd) {
+	Key kc = itc->first;
+	Key kd = itd->first;
+	if(not A.has_block(kc.first, kd.first)) {	  
+	  cout << "C:" << endl;
+	  C.SimplePrint();
+	  cout << "A:" << endl;
+	  A.SimplePrint();
+	  cout << "D:" << endl;
+	  D.SimplePrint();
+	  THROW_ERROR("structure mismatch");
+	    }
+	if(not res->has_block(kc.second, kd.second)) {
+	  int n = itc->second.cols();
+	  int m = itd->second.cols();
+	  (*res)(kc.second, kd.second) = MatrixXcd::Zero(n, m);
+	}
       }
     }
 
+    // -- calcualtion --
     for(It itc = C.begin(); itc != C.end(); ++itc) {
       for(It ita = A.begin(); ita != A.end(); ++ita) {
 	for(It itd = D.begin(); itd != D.end(); ++itd) {
@@ -535,11 +565,30 @@ namespace cbasis {
 	  const MatrixXcd& md = itd->second;
 	  if(kc.first == ka.first and ka.second == kd.first) {
 	    Key kres(kc.second, kd.second);
-	    CtAD(mc, ma, md, &(*res)[kres]);
+	    try {
+	      CtAD(mc, md, ma, &(*res)[kres]);
+	    } catch(exception& e) {
+	      stringstream ss;
+	      ss << "error on CtAD on each matrix\n";
+	      ss << format("C(%s) at (%d, %d)\n")
+		% C.get_name() % kc.first % kc.second;		
+	      ss << format("A(%s) at (%d, %d)\n")
+		% A.get_name() % ka.first % ka.second;
+	      ss << format("D(%s) at (%d, %d)\n")
+		% D.get_name() % kd.first % kd.second;
+	      ss << e.what();
+	      THROW_ERROR(ss.str());
+	    }
 	  }
 	}
       }
     }
+  }
+  void BMatCtA(const BMat& C, const BMat& A, BMat *res) {
+    BMat S;
+    Copy(C, S);
+    S.SetId();
+    BMatCtAD(C, S, A, res);
   }
   void BMatRead(BMat::Map& bmat, string fn) {
     ifstream f(fn.c_str(), ios::in|ios::binary);

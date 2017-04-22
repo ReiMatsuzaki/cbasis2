@@ -76,7 +76,6 @@ TEST(EigenPlus, ComplexDiag) {
     for(int j = 0; j < n; j++) {      
       VectorXcd Cj = es.eigenvectors().col(j);
       complex_normalize(Cj);
-      dcomplex ej  = es.eigenvalues()(j);
       if(i == j) {
 	EXPECT_C_EQ(1.0, TDot(Ci, Cj));
 	EXPECT_C_EQ(ei, TDot(Ci, H*Cj));

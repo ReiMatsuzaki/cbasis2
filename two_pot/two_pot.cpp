@@ -1071,7 +1071,6 @@ void Calc_one_lin() {
 
 void Calc_RPA_Eigen() {
   
-
   // ==== build RPA Hamiltonian ====
   BVec eig1;
   BMat U1;
@@ -1257,6 +1256,9 @@ void Calc_RPA_Eigen_IVO() {
     cout << TDot(Y, Y) - TDot(Z, Z) << endl;
   }
   
+}
+void Calc_RPA_Eigen_HF() {
+
 }
 int main(int argc, char *argv[]) {
   cout << ">>>> two_pot >>>>" << endl;

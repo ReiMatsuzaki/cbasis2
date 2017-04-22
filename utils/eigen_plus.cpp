@@ -1,7 +1,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <iostream>
-
+#include <boost/format.hpp>
 #include "typedef.hpp"
 #include "macros.hpp"
 
@@ -9,6 +9,7 @@
 
 using namespace std;
 using namespace Eigen;
+using boost::format;
 
 MatrixXcd
 m13cd(dcomplex m00, dcomplex m01, dcomplex m02) {
@@ -191,8 +192,8 @@ void CanonicalMatrix(const CM& S, double eps, CM* res) {
   es.compute(S, true);
   CV s;
   CM U;
-  s.swap(es.eigenvalues());
-  U.swap(es.eigenvectors());
+  s = es.eigenvalues();
+  U = es.eigenvectors();
   SortEigs(s, U, TakeAbs, true);
   
   int num_non0(0);
@@ -236,8 +237,8 @@ void CanonicalMatrixNum(const CM& S, int num0, CM* res) {
   es.compute(S, true);
   CV s;
   CM U;
-  s.swap(es.eigenvalues());
-  U.swap(es.eigenvectors());
+  s = es.eigenvalues();
+  U = es.eigenvectors();
   SortEigs(s, U, TakeAbs, true);
 
   MatrixXcd X = MatrixXcd::Zero(num_all, num0);
@@ -260,7 +261,7 @@ void CEigenSolveCanonical(const CM& F, const CM& S, double eps, CM* c, CV* eig) 
   ComplexEigenSolver<CM> es;
   es.compute(Fp, true);
   *c = X * es.eigenvectors();
-  eig->swap(es.eigenvalues());
+  *eig = es.eigenvalues();
   SortEigs(*eig, *c, TakeReal, false);
 
 }
@@ -274,7 +275,7 @@ void CEigenSolveCanonicalNum(const CM& F, const CM& S, int num0,
   ComplexEigenSolver<CM> es;
   es.compute(Fp, true);
   *c = X * es.eigenvectors();
-  eig->swap(es.eigenvalues());
+  *eig = es.eigenvalues();
   SortEigs(*eig, *c, TakeReal, false);
   
 }
@@ -291,10 +292,20 @@ void CtAD(const CM& C, const CM& D, const CM& A, CM *res) {
   int nl = D.rows();
 
   if(A.rows() != nk) {
-    THROW_ERROR("size of A and C mismatch");
+    stringstream ss;
+    ss << "size of A and C mismatch\n";
+    ss << format("C: (%d, %d)\n") % C.rows() % C.cols();
+    ss << format("A: (%d, %d)\n") % A.rows() % A.cols();
+    ss << format("D: (%d, %d)\n") % D.rows() % D.cols();
+    THROW_ERROR(ss.str());
   }
   if(A.cols() != nl) {
-    THROW_ERROR("size of A and D miscmatch");
+    stringstream ss;
+    ss << "size of A and D mismatch\n";
+    ss << format("C: (%d, %d)\n") % C.rows() % C.cols();
+    ss << format("A: (%d, %d)\n") % A.rows() % A.cols();
+    ss << format("D: (%d, %d)\n") % D.rows() % D.cols();
+    THROW_ERROR(ss.str());
   }
 
   if(res->rows() != ni || res->cols() != nj) {

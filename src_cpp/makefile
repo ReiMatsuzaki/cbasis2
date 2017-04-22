@@ -5,23 +5,23 @@ VALGRIND=valgrind --error-limit=no --tool=memcheck --leak-check=full --show-reac
 
 ifeq (${ARCH},fast)
   # calculation speed
-  CXXFLAGS=${INC_PATH} -Wall -O3 -DARG_NO_CHECK -DEIGEN_NO_DEBUG 
+  CXXFLAGS=-I${INC_PATH} -Wall -O3 -DARG_NO_CHECK -DEIGEN_NO_DEBUG 
   RUN=
 endif
 ifeq (${ARCH},debug)
   # debug mode
-  CXXFLAGS=${INC_PATH} -Wall
+  CXXFLAGS=-I${INC_PATH} -Wall
   RUN=
 #VALGRIND
 endif
 ifeq (${ARCH},mem)
   # for memory check. (very slow)
-  CXXFLAGS=${INC_PATH} -Wall -pg -g -fno-inline -DARG_NO_CHECK -DEIGEN_NO_DEBUG 
+  CXXFLAGS=-I${INC_PATH} -Wall -pg -g -fno-inline -DARG_NO_CHECK -DEIGEN_NO_DEBUG 
   RUN=VALGRIND
 endif
 ifeq (${ARCH},time)
   # for time profile
-  CXXFLAGS=${INC_PATH} -Wall -pg -g -DARG_NO_CHECK -DEIGEN_NO_DEBUG 
+  CXXFLAGS=-I${INC_PATH} -Wall -pg -g -DARG_NO_CHECK -DEIGEN_NO_DEBUG 
   RUN=iprofiler -timeprofiler -T 30
 endif
 BINDIR=bin/${ARCH}

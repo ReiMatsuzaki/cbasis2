@@ -7,6 +7,7 @@
 #include "b2eint.hpp"
 
 namespace cbasis {
+  
   void CalcFock(const BMat& T, const BMat& V,
 		Irrep irr0, const Eigen::VectorXcd& c0,
 		B2EInt eri_J, B2EInt eri_K, BMat *H) {
@@ -74,7 +75,7 @@ namespace cbasis {
       BMatInvSqrt(AmB, inv_sqrt_AmB);
       Multi3(sqrt_AmB, ApB, sqrt_AmB, H);
     }
-    void CalcH_HF(const BMat& H_IVO_AO, dcomplex eig0_HF,		    
+    void CalcH_HF(const BMat& H_IVO_AO, dcomplex eig0_HF,	    
 		  const BMat& K,
 		  const BVec& eig_HF, const BMat& U_HF) {
       // -- A Mat --
@@ -146,7 +147,30 @@ namespace cbasis {
 	acc_z2 += TDot(m.col(I), m.col(I));
       }
       return acc_y2 - acc_z2;
-    }    
+    }
+    void CalcOneInt(const BMat& z_HF, BVec *z_RPA, bool symmetric) {
+      /**
+	 z_HF  : HF basis one particle operator matrix.
+	 <I_RPA|o|J_0> = sqrt(2) (Y_iI <i|z|j> + Z_iI <j|>)
+       */
+      double sign = (symmetric ? 1.0 : -1.0);
+      typedef Eigen::MatrixXcd MatrixXcd;
+      typedef Eigen::VectorXcd VectorXcd;
+      typedef BMat::const_iterator It;
+      for(It it = z_HF.begin(); it != z_HF.end(); ++it) {
+	Irrep irr = it->first.first;
+	const MatrixXcd& z = it->second;
+	(*z_RPA)(irr) = VectorXcd::Zero(z.cols());
+	const MatrixXcd& ZZ(Z(irr, irr));
+	const MatrixXcd& YY(Y(irr, irr));
+	VectorXcd& zz = (*z_RPA)(irr);
+	for(int I = 0; I < z.rows(); I++) {
+	  for(int i = 0; i < z.rows(); i++) {
+	    zz(I) += YY(i,I)*z(i,0) + sign*ZZ(i, I)*z(i, 0);
+	  }
+	}
+      }      
+    }
   };
   /*
   void CalcRPAHamiltonian_AO(const BMat& H_IVO_AO, const BMat& S, const BMat& K,

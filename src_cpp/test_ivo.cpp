@@ -1,15 +1,19 @@
 #include <gtest/gtest.h>
+#include <boost/format.hpp>
 #include "../utils/eigen_plus.hpp"
 #include "../utils/gtest_plus.hpp"
 #include "../utils/typedef.hpp"
 #include "one_int.hpp"
 #include "two_int.hpp"
 
+
 #include "ivo.hpp"
 
 using namespace std;
 using namespace cbasis;
 using namespace Eigen;
+using boost::format;
+
 class TestIVO : public ::testing::Test {
 public:  
   SymGTOs us_0;
@@ -24,6 +28,9 @@ public:
   BMat U_IVO;
   
   void PrepareBasis() {
+    U_HF.set_name("U_HF");
+    U_IVO.set_name("U_IVO");
+    
     // -- symmetry --
     SymmetryGroup sym = SymmetryGroup_D2h();
 
@@ -50,7 +57,9 @@ public:
 
     
     // -- basis for excited state --
-    VectorXcd zs = zeta_s;
+    VectorXcd zs(8);
+    zs << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053,
+      30.17990, 108.7723;
     us_1 = NewSymGTOs(mole);
     us_1->NewSub("He").SolidSH_M(1, 0, zs);
     us_1->SetUp();
@@ -101,12 +110,17 @@ public:
   }
 };
 TEST_F(TestIVO, Delta_E) {
- 
-  cout << de_HF << endl;
-  cout << de_IVO << endl;
-  cout << RPA_HF.w << endl;
-  cout << RPA_IVO.w << endl;
-
+  int n = us_1->size_basis();
+  Irrep irr1 = us_1->sym_group()->irrep_z();
+  cout << "E0 = " << mo_0->eigs(0)(0).real() << endl;
+  cout << "Delta E" << endl;
+  for(int I = 0; I < n; I++) {
+    cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+      % de_HF(irr1)(I).real()
+      % de_IVO(irr1)(I).real()
+      % RPA_HF.w(irr1)(I).real()
+      % RPA_IVO.w(irr1)(I).real();
+  }
 }
 TEST_F(TestIVO, Norm) {
  
@@ -122,27 +136,54 @@ TEST_F(TestIVO, Norm) {
 }
 TEST_F(TestIVO, Moment) {
 
-  /**
-     AO basis dipole matrix element
-     <u1_i | z | u0_j>
-   */
-  BMat x,y,z,dx,dy,dz;
+  // -- AO basis dipole matrix element --
+  BMat x,y,z("z"),dx,dy,dz;
   CalcDipMat(us_1, us_0, &x, &y, &z, &dx, &dy, &dz);
 
-  BMat z_HF, z_IVO, z_RPA_HF, z_RPA_IVO;
-  BMatCtAD(U_HF,      mo_0->C, z,     &z_HF);
-  BMatCtAD(U_IVO,     mo_0->C, z,     &z_IVO);
-  BMatCtAD(RPA_HF.U,  U_HF,    z_HF,  &z_RPA_HF);
-  BMatCtAD(RPA_IVO.U, U_IVO,   z_IVO, &z_RPA_IVO);
+  // -- many electron --
+  BMat z_HF("z_HF"); 
+  BMatCtAD(U_HF, mo_0->C, z, &z_HF);
+  BMat z_IVO("z_IVO");
+  BMatCtAD(U_IVO, mo_0->C, z, &z_IVO);
+  BVec z_RPA_HF;
+  RPA_HF.CalcOneInt(z_HF, &z_RPA_HF, true);
+  BVec z_RPA_IVO;
+  RPA_IVO.CalcOneInt(z_IVO, &z_RPA_IVO, true);
 
+  // -- print out --
   Irrep irr1 = us_1->sym_group()->irrep_z();
-  for(int I = 0; I < 10; I++) {
-    cout << z_HF(irr1, 0)(I, 0) << ", "
-	 << z_IVO(irr1, 0)(I, 0) << ", "
-	 << z_RPA_HF(irr1, 0)(I, 0) << ", "
-	 << z_RPA_IVO(irr1, 0)(I, 0) 
-	 << endl;
+  int n = us_1->size_basis();
+  for(int I = 0; I < n; I++) {
+    cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+      % z_HF(irr1, 0)(I, 0).real()
+      % z_IVO(irr1, 0)(I, 0).real()
+      % z_RPA_HF(irr1)(I).real()
+      % z_RPA_IVO(irr1)(I).real();
   }
+
+  // -- check sum rule --
+  dcomplex acc_HF(0), acc_IVO(0), acc_RPA_HF(0), acc_RPA_IVO(0);
+  for(int I = 0; I < n; I++) {
+    dcomplex ele_z = z_HF(irr1, 0)(I, 0);
+    acc_HF += 2.0/3.0 * de_HF(irr1)(I) * ele_z * ele_z;
+
+    ele_z = z_IVO(irr1, 0)(I, 0);
+    acc_IVO += 2.0/3.0 * de_IVO(irr1)(I) * ele_z * ele_z;
+    
+    ele_z = z_RPA_HF(irr1)(I);
+    acc_RPA_HF += 2.0/3.0 * RPA_HF.w(irr1)(I) * ele_z * ele_z;
+
+    ele_z = z_RPA_IVO(irr1)(I);
+    acc_RPA_IVO += 2.0/3.0 * RPA_IVO.w(irr1)(I) * ele_z * ele_z;
+    
+  }
+  cout << "sum of oscillator strength" << endl;
+  cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+    % acc_HF.real()
+    % acc_IVO.real()
+    % acc_RPA_HF.real()
+    % acc_RPA_IVO.real();
+
 }
 
 int main(int argc, char **args) {
