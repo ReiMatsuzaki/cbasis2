@@ -1,4 +1,4 @@
-include local.mk
+include ../local.mk
 VPATH=../src_cpp ../utils ../math
 CPPFLAGS+=-Wall -fPIC
 #ifeq (\$(OS),Linux)
