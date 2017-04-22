@@ -5,8 +5,7 @@
 #include "../utils/typedef.hpp"
 #include "one_int.hpp"
 #include "two_int.hpp"
-
-
+#include "mo.hpp"
 #include "ivo.hpp"
 
 using namespace std;
@@ -20,6 +19,8 @@ public:
   SymGTOs us_1;
 
   MO mo_0;
+  VectorXcd c0;
+  dcomplex E0;
   CalcRPA RPA_HF;
   CalcRPA RPA_IVO;
   BVec de_HF;
@@ -54,7 +55,8 @@ public:
     if(not conv) {
       cout << "failed to conversion" << endl;
     }
-
+    c0 = mo_0->C(0, 0).col(0);
+    E0 = mo_0->eigs(0)(0);
     
     // -- basis for excited state --
     VectorXcd zs(8);
@@ -139,24 +141,26 @@ TEST_F(TestIVO, Moment) {
   // -- AO basis dipole matrix element --
   BMat x,y,z("z"),dx,dy,dz;
   CalcDipMat(us_1, us_0, &x, &y, &z, &dx, &dy, &dz);
+  BVec zz;
+  Irrep irr1 = us_1->sym_group()->irrep_z();
+  zz(irr1) = z(irr1,0) * c0;  
 
   // -- many electron --
-  BMat z_HF("z_HF"); 
-  BMatCtAD(U_HF, mo_0->C, z, &z_HF);
-  BMat z_IVO("z_IVO");
-  BMatCtAD(U_IVO, mo_0->C, z, &z_IVO);
+  BVec z_HF("z_HF");
+  BVecCtx(U_HF, zz, &z_HF);
+  BVec z_IVO("z_IVO");
+  BVecCtx(U_IVO, zz, &z_IVO);
   BVec z_RPA_HF;
   RPA_HF.CalcOneInt(z_HF, &z_RPA_HF, true);
   BVec z_RPA_IVO;
   RPA_IVO.CalcOneInt(z_IVO, &z_RPA_IVO, true);
 
-  // -- print out --
-  Irrep irr1 = us_1->sym_group()->irrep_z();
+  // -- print out --  
   int n = us_1->size_basis();
   for(int I = 0; I < n; I++) {
     cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
-      % z_HF(irr1, 0)(I, 0).real()
-      % z_IVO(irr1, 0)(I, 0).real()
+      % z_HF(irr1)(I).real()
+      % z_IVO(irr1)(I).real()
       % z_RPA_HF(irr1)(I).real()
       % z_RPA_IVO(irr1)(I).real();
   }
@@ -164,10 +168,10 @@ TEST_F(TestIVO, Moment) {
   // -- check sum rule --
   dcomplex acc_HF(0), acc_IVO(0), acc_RPA_HF(0), acc_RPA_IVO(0);
   for(int I = 0; I < n; I++) {
-    dcomplex ele_z = z_HF(irr1, 0)(I, 0);
+    dcomplex ele_z = z_HF(irr1)(I);
     acc_HF += 2.0/3.0 * de_HF(irr1)(I) * ele_z * ele_z;
 
-    ele_z = z_IVO(irr1, 0)(I, 0);
+    ele_z = z_IVO(irr1)(I);
     acc_IVO += 2.0/3.0 * de_IVO(irr1)(I) * ele_z * ele_z;
     
     ele_z = z_RPA_HF(irr1)(I);

@@ -149,8 +149,7 @@ namespace cbasis {
 	  << sep << setw(10) << right << ""
 	  << sep << setw(10) << right << ""
 	  << sep<< endl;
-      
-      typedef vector<Vector3cd>::const_iterator It;
+
       BOOST_FOREACH(Vector3cd xyz, atom->xyz_list()) {
 	oss << setfill(' ')
 	    << sep << setw(4) << ""

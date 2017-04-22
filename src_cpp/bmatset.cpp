@@ -121,7 +121,20 @@ namespace cbasis {
 	(*b)(k)(i) = sqrt(vec(i));
       }
     }
-  }  
+  }
+  void BVecCtx(const BMat& C, const BVec& x, BVec *y) {
+    if(not C.is_block_diagonal()) {
+      THROW_ERROR("C must be block diagonal");
+    }
+    for(BVec::const_iterator itx = x.begin(); itx != x.end(); ++itx) {
+      for(BMat::const_iterator itc = C.begin(); itc != C.end(); ++itc) {
+	if(itx->first == itc->first.first) {
+	  Ctx(itc->second, itx->second,
+	      &(*y)(itc->first.second));
+	}
+      }
+    }
+  }
   // ==== BMat ====
   void BMat::Clear() {
     this->map_.clear();

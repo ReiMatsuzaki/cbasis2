@@ -11,7 +11,6 @@
 #include "lgamma.hpp"
 #include "angmoment.hpp"
 #include "mol_func.hpp"
-
 #include "bmatset.hpp"
 
 using namespace std;
@@ -64,6 +63,20 @@ TEST(BVec, add) {
 
   EXPECT_C_EQ(x0(0)(1) + 1.1*y(0)(1), x(0)(1));
   
+}
+TEST(BVec, Ctx) {
+  BMat C;
+  C(0, 0) = MatrixXcd::Random(2,3);
+  C(1, 1) = MatrixXcd::Random(4,5);
+  BVec x;
+  x(0) = VectorXcd::Random(2);
+  x(1) = VectorXcd::Random(4);
+  BVec y;
+  BVecCtx(C, x, &y);
+
+  VectorXcd Ctx0;
+  Ctx0 = C(0,0).transpose() * x(0);
+  EXPECT_C_EQ(Ctx0(0), y(0)(0));
 }
 TEST(BMat, ReadWrite) {
 
@@ -506,6 +519,10 @@ TEST(MultArray, TDot) {
   xs(0,1) = 9; ys(0,1) = 3; 
   xs(1,1) = 11; ys(1,1) = 4;
 
+  for(int i = 0; i < 4; i++) {
+    cout << i << " " << xs.data_[i] << " " << ys.data_[i] << endl;
+  }
+  cout << xs.size() << ys.size() << endl;
   int ref = 7*(-1) + 8*(-2) + 9*3+11*4;
   EXPECT_EQ(ref, MultArrayTDot(xs, ys));
   

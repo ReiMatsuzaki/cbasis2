@@ -286,9 +286,9 @@ void CtAD(const CM& C, const CM& D, const CM& A, CM *res) {
      (C^T A D)_{ij} = C_{ki} A_{kl} D(lj)
   */
  
-  int ni = C.rows();
+  int ni = C.cols();
   int nj = D.cols();
-  int nk = C.cols();
+  int nk = C.rows();
   int nl = D.rows();
 
   if(A.rows() != nk) {
@@ -398,17 +398,15 @@ void Ctx(const CM& C, const CV& x, CV *Ctx) {
    */
  
   int n = C.rows();
-  if(n != C.cols()) {
-    THROW_ERROR("C is not square");
-  }
+  int m = C.cols();
   if(n != x.size()) {
     THROW_ERROR("size of x mismatch to A");
   }
-  if(Ctx->size() != n) {
-    *Ctx = VectorXcd::Zero(n);
+  if(Ctx->size() != m) {
+    *Ctx = VectorXcd::Zero(m);
   }
 
-  for(int i = 0; i < n; i++) {
+  for(int i = 0; i < m; i++) {
     dcomplex acc(0);
     for(int k = 0; k < n; k++) {
       acc += C(k, i) * x(k);

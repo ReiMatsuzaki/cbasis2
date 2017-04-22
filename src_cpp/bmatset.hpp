@@ -44,7 +44,7 @@ namespace cbasis {
     void Add(dcomplex a, const BVec& o);
   };
   std::ostream& operator << (std::ostream& os, const BVec& a);
-  void BVecSqrt(const BVec& a, BVec *b);
+  void BVecSqrt(const BVec& a, BVec *b);  
 
   // ==== Block Matrix ====
   class BMat {
@@ -112,6 +112,7 @@ namespace cbasis {
   void BMatCtAC(const BMat& C, const BMat& A, BMat *res);
   void BMatCtAD(const BMat& C, const BMat& D, const BMat& A, BMat *res);
   void BMatCtA(const BMat& C, const BMat& A, BMat *res);
+  void BVecCtx(const BMat& C, const BVec& x, BVec *y);
   void BMatEigenSolve(const BMat& H, const BMat& S, BMat *C, BVec *E);
   void BMatEigenSolve(const BMat& H, BMat *C, BVec *E);
   

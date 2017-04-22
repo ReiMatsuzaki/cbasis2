@@ -40,7 +40,7 @@ namespace cbasis {
     int size() const { return num_; }
     void SetRange(int n0, int n1) {
       n0_[0] = n0; n1_[0] = n1;
-      int num_ = n1-n0+1;
+      num_ = n1-n0+1;
       if(data_num_ < num_) {
 	std::string msg; SUB_LOCATION(msg);
 	msg = "\n" + msg + " : not enough capacity";
@@ -105,7 +105,7 @@ namespace cbasis {
     void SetRange(int nx0, int nx1, int ny0, int ny1) {
       n0_[0] = nx0; n0_[1] = ny0;
       n1_[0] = nx1; n1_[1] = ny1;
-      int num_ = (nx1-nx0+1)*(ny1-ny0+1);
+      num_ = (nx1-nx0+1)*(ny1-ny0+1);
       if(data_num_ < num_) {
 	delete[] data_;
 	data_num_ = num_;

@@ -1259,6 +1259,35 @@ void Calc_RPA_Eigen_IVO() {
 }
 void Calc_RPA_Eigen_HF() {
 
+  // -- AO basis --
+  CalcSTVMat(basis1, basis1, &S1, &T1, &V1);
+  B2EInt eri_J_11 = CalcERI(basis1, basis1, basis0, basis0, eri_method);
+  B2EInt eri_K_11 = CalcERI(basis1, basis0, basis0, basis1, eri_method);
+  BMat K1; Copy(S1, K1); K.SetZero();
+  AddK(eri_K_11, c0, 0, 1.0, K1);
+  BMat H_IVO_1;
+  CalcSTEXHamiltonian(T1, V1, 0, c0, eri_J_11, eri_K_11, &H_IVO_1);
+
+  // -- HF --
+  BMat H_HF_1;
+  CalcFock(T1, V1, 0, c0, eri_J_11, eri_K_11, &H_HF_1);
+  BMat U_HF_1;
+  BVec eig_HF_1;
+  BMatEigenSolve(H_HF_1, S1, &U_HF_1, &eig_HF_1);
+  
+  // -- RPA --
+  RPA rpa;
+  rpa.CalcH_HF(H_IVO_1, E0, K, eig_HF_1, U_HF_1);
+  rpa.SolveEigen();
+   
+  // -- dipole --
+  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i;
+  CalcDipMat(basis1, basis0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
+  s1(x) = X1i(x, 0) * c0; sD1(x) = DX1i(x, 0) * c0; 
+  s1(y) = Y1i(y, 0) * c0; sD1(y) = DY1i(y, 0) * c0; 
+  s1(z) = Z1i(z, 0) * c0; sD1(z) = DZ1i(z, 0) * c0;  
+  
+  
 }
 int main(int argc, char *argv[]) {
   cout << ">>>> two_pot >>>>" << endl;

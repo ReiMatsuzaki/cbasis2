@@ -40,7 +40,7 @@ namespace cbasis {
     double s = sqrt(pi*(az-x)/(8.0*z2)) + eps;
 
     int NF_max(50);
-    int NF(0);
+    //    int NF(0);
     int NF_0(10);
     double* anR = new double[NF_max+1];
     double* anI = new double[NF_max+1];
@@ -61,7 +61,7 @@ namespace cbasis {
       if(n > NF_0)
 	if(c * delta > std::abs(anR[n]) && s*delta > std::abs(anI[n])) {
 	  convq = true;
-	  NF = n;
+	  //	  NF = n;
 	  break;
 	}
     }
