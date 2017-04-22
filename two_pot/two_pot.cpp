@@ -72,6 +72,7 @@ string solve_driv_type;
 LinearSolver linear_solver;
 
 // -- write_psi --
+bool write_psi_q;
 string write_psi_filename;
 VectorXd write_psi_rs;
 int   write_psi_lmax;
@@ -264,12 +265,17 @@ void Parse() {
       }
     }
     
-    // -- write wave function --
-    CheckObject<object>(obj, "write_psi");
-    object& write_psi_obj = obj["write_psi"].get<object>();
-    write_psi_filename = ReadJson<string>(write_psi_obj, "file");
-    write_psi_rs = ReadJson<VectorXd>(write_psi_obj, "rs");
-    write_psi_lmax = ReadJson<int>(write_psi_obj, "lmax");
+    // -- write wave function --    
+    if(obj.find("write_psi") != obj.end())  {
+      write_psi_q = true;
+      CheckObject<object>(obj, "write_psi");      
+      object& write_psi_obj = obj["write_psi"].get<object>();
+      write_psi_filename = ReadJson<string>(write_psi_obj, "file");
+      write_psi_rs = ReadJson<VectorXd>(write_psi_obj, "rs");
+      write_psi_lmax = ReadJson<int>(write_psi_obj, "lmax");
+    } else {
+      write_psi_q = false;
+    }
 
     // -- number of calculation term --
     string str_calc_term = ReadJsonWithDefault<string>(obj, "calc_term", "full");
@@ -405,10 +411,14 @@ void PrintIn() {
   PrintTimeStamp("PrintIn", NULL);
   cout << "comment: " << comment << endl;
   cout << "in_json: " << in_json << endl;
-  cout << "write_psi_filename: " << write_psi_filename << endl;
-  VectorXd& rs = write_psi_rs;
-  cout << format("write_psi_rs: [%5.3f, %5.3f, ..., %5.3f]\n") % rs[0] % rs[1] % rs[rs.size()-1];
-  cout << "write_psi_lmax: " << write_psi_lmax << endl;
+  if(write_psi_q) {
+    cout << "write_psi_filename: " << write_psi_filename << endl;
+    VectorXd& rs = write_psi_rs;
+    cout << format("write_psi_rs: [%5.3f, %5.3f, ..., %5.3f]\n") % rs[0] % rs[1] % rs[rs.size()-1];
+    cout << "write_psi_lmax: " << write_psi_lmax << endl;
+  } else {
+    cout << "write_psi: no\n";
+  }
   cout << "cs_csv: "  << cs_csv;
   cout << "out_json: " << out_json << endl;
   cout << "calc_type: " << calc_type << endl;
@@ -912,9 +922,8 @@ void PrintOut() {
     f << endl;
   }
   f.close();
-
   
-  if(write_psi_filename != "") {
+  if(write_psi_q) {
     VectorXd& rs = write_psi_rs;
     int irr = sym->irrep_z();
     ofstream f(write_psi_filename.c_str(), ios::out);
@@ -1328,10 +1337,10 @@ void Calc_RPA_Eigen_HF() {
 	muphi_psi1_v[i] += dv*dv/(w-wi);
       } 
     }
-    
-    CalcMain_alpha(iw);    
+    CalcMain_alpha(iw);
     //    CalcMain(iw);
-  } 
+  }
+  PrintOut();
   
 }
 int main(int argc, char *argv[]) {
