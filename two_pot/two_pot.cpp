@@ -1322,9 +1322,6 @@ void Calc_RPA_Eigen_HF() {
     cout << "E_au: " << w + E0 << endl;
     cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
 
-    // -- calculate alpha --
-    // <mu phi0, psi1> = sum_I d_I d_I/(w-dEI)
-    // d_I = <I|mu|0>
     BOOST_FOREACH(Irrep i, irreps) {
       muphi_psi1[i] = 0.0;
       muphi_psi1_v[i] = 0.0;
