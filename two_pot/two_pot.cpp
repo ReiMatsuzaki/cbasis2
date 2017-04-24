@@ -957,7 +957,6 @@ void PrintOut() {
     }
   }
 }
-
 void Calc_one_lin() {
   PrintTimeStamp("Calc_one_lin", NULL);
   PrintTimeStamp("CalcMat", NULL);
@@ -1090,7 +1089,6 @@ void Calc_one_lin() {
   }
   
 }
-
 void Calc_RPA_Eigen() {
   
   // ==== build RPA Hamiltonian ====
@@ -1279,6 +1277,7 @@ void Calc_RPA_Eigen_IVO() {
   }
   
 }
+
 void Solve_0th(map<int, BMat> *U0, map<int, BVec> *eig0,	       
 	       map<int, BVec> *r, map<int, BVec> *d,
 	       map<int, BVec> *s) {
@@ -1303,7 +1302,6 @@ void Solve_0th(map<int, BMat> *U0, map<int, BVec> *eig0,
     CalcSTVMat(b0L, b0L, &S, &H, &V);
     H.Add(1.0, V);
     BMatEigenSolve(H, S, &(*U0)[L], &(*eig0)[L]);
-    cout << (*eig0)[L] << endl;
 
     // -- dipole moment --
     BMat X, DX, Y, DY, Z, DZ, r_ao, d_ao, r_mat, d_mat;
@@ -1367,11 +1365,51 @@ void Solve_1st_One(BMat *U1, BVec *ws, BVec *r, BVec *d) {
     (*r)[irr] = rmat(irr, 0).col(0);
     (*d)[irr] = dmat(irr, 0).col(0);
   }
-
-  
   
 }
-void Solve_RPA(CalcRPA *rpa, BMat* U_HF, BVec *r_RPA, BVec *d_RPA) {
+void Solve_1st_STEX(BMat *U1, BVec *w1, BVec *r1, BVec *d1) {
+  
+  PrintTimeStamp("Solve_1st_STEX", NULL);
+  
+  // --  ground state --
+  int ng = basis0->size_basis_isym(0);
+  BMat U_g;
+  U_g(0, 0) = MatrixXcd::Zero(ng, ng);
+  U_g(0, 0).col(0) = c0;
+
+  // -- AO basis --
+  BMat S, T, V;
+  CalcSTVMat(basis1, basis1, &S, &T, &V);  
+  B2EInt eri_J = CalcERI(basis1, basis1, basis0, basis0, eri_method);
+  B2EInt eri_K = CalcERI(basis1, basis0, basis0, basis1, eri_method);
+  BMat K; Copy(S, K); K.SetZero();
+  AddK(eri_K, c0, 0, 1.0, K);
+  BMat H_IVO;
+  CalcSTEXHamiltonian(T, V, 0, c0, eri_J, eri_K, &H_IVO);
+
+  BMatEigenSolve(H_IVO, S, U1, w1);
+  w1->Shift(-E0);
+
+  // -- dipole -
+  Irrep x = sym->irrep_x();
+  Irrep y = sym->irrep_y();
+  Irrep z = sym->irrep_z();
+  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, r_ao, d_ao;
+  CalcDipMat(basis1, basis0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
+  r_ao(x,0) = X1i(x,0); d_ao(x,0) = DX1i(x,0);
+  r_ao(y,0) = Y1i(y,0); d_ao(y,0) = DY1i(y,0);
+  r_ao(z,0) = Z1i(z,0); d_ao(z,0) = DZ1i(z,0);
+  BMat rmat, dmat;
+  BMatCtAD(*U1, U_g, r_ao, &rmat);
+  BMatCtAD(*U1, U_g, d_ao, &dmat);
+
+  BOOST_FOREACH(Irrep irr, irreps) {
+    (*r1)[irr] = rmat(irr, 0).col(0);
+    (*d1)[irr] = dmat(irr, 0).col(0);
+  }
+    
+}
+void Solve_1st_RPA(CalcRPA *rpa, BMat* U_HF, BVec *r_RPA, BVec *d_RPA) {
   
   PrintTimeStamp("Solve_RPA", NULL);
   // -- HF for ground state --
@@ -1416,6 +1454,21 @@ void Solve_RPA(CalcRPA *rpa, BMat* U_HF, BVec *r_RPA, BVec *d_RPA) {
   rpa->CalcOneInt(d_HF, d_RPA, false);
   
 }
+void CalcOStrength(const BVec& w, const BVec& r, const BVec& d, dcomplex *os_r, dcomplex *os_d) {
+
+  *os_r = 0.0;
+  *os_d = 0.0;
+  BOOST_FOREACH(Irrep irr, irreps) {
+    int n = w[irr].size();
+    for(int I = 0; I < n; I++) {
+      dcomplex wI = w(irr)(I);
+      dcomplex rI = r(irr)(I);
+      dcomplex dI = d(irr)(I);
+      *os_r += 2.0/3.0*wI*rI*rI;
+      *os_d += 2.0/3.0*wI*dI*dI;
+    }
+  }
+}
 void Calc_V_one(const map<int, BMat>& U0, const BMat& U1,
 		map<int, BMat> *v, map<int, BMat> *u) {
   PrintTimeStamp("Calc_V_one", NULL);
@@ -1438,6 +1491,37 @@ void Calc_V_one(const map<int, BMat>& U0, const BMat& U1,
   }  
   
 }
+void Calc_V_STEX(const map<int, BMat>& U0, const BMat& U1,
+		 map<int, BMat> *v, map<int, BMat> *u) {
+  
+  PrintTimeStamp("Calc_V_STEX", NULL);
+  BOOST_FOREACH(int L, Ls) {
+
+    SymGTOs b0L =  basis_psi0_L[L];    
+    BMat V1, V0;
+    CalcVMat(b0L,  mole,  basis1, &V1);
+    CalcVMat(b0L,  mole0, basis1, &V0);    
+    B2EInt eri_J = CalcERI(b0L, basis1, basis0, basis0, eri_method);
+    B2EInt eri_K = CalcERI(b0L, basis0, basis0, basis1, eri_method);
+    V1.Add(-1.0, V0);
+    AddJ(eri_J, c0, irrep0, 1.0, V1);
+    AddK(eri_K, c0, irrep0, 1.0, V1);
+    BMatCtAD(U0.at(L), U1, V1, &((*v)[L]));
+
+    SymGTOs cb0L =  basis_c_psi0_L[L];
+    BMat CV1, CV0;
+    CalcVMat(cb0L, mole,  basis1, &CV1);    
+    CalcVMat(cb0L, mole0, basis1, &CV0);
+    B2EInt c_eri_J = CalcERI(cb0L, basis1, basis0, basis0, eri_method);
+    B2EInt c_eri_K = CalcERI(cb0L, basis0, basis0, basis1, eri_method);
+    CV1.Add(-1.0, CV0);
+    AddJ(c_eri_J, c0, irrep0, 1.0, CV1);
+    AddK(c_eri_K, c0, irrep0, 1.0, CV1);
+    BMatCaAD(U0.at(L), U1, CV1, &((*u)[L]));
+  
+  }
+  
+}
 void Calc_V_RPA(const map<int, BMat>& U0, 
 		const CalcRPA& rpa, const BMat U1_HF, 
 		map<int, BMat> *v, map<int, BMat> *u) {
@@ -1455,7 +1539,7 @@ void Calc_V_RPA(const map<int, BMat>& U0,
     AddJ(eri_J, c0, irrep0, 1.0, V1);
     AddK(eri_K, c0, irrep0, 1.0, V1);
     BMat VV;
-    BMatCtAD(U0.find(L)->second, U1_HF, V1, &VV);
+    BMatCtAD(U0.at(L), U1_HF, V1, &VV);
     rpa.CalcOneIntRight(VV, &(*v)[L], true);
 
     SymGTOs cb0L =  basis_c_psi0_L[L];
@@ -1468,7 +1552,7 @@ void Calc_V_RPA(const map<int, BMat>& U0,
     AddJ(c_eri_J, c0, irrep0, 1.0, CV1);
     AddK(c_eri_K, c0, irrep0, 1.0, CV1);
     BMat UU;
-    BMatCaAD(U0.find(L)->second, U1_HF, CV1, &UU);
+    BMatCaAD(U0.at(L), U1_HF, CV1, &UU);
     rpa.CalcOneIntRight(UU, &(*u)[L], true);
   
   }
@@ -1482,6 +1566,11 @@ void CalcBraket_eigen(const map<int, BVec>& eig0,
 		      dcomplex w) {
 
   PrintTimeStamp("CalcBraket_eigen", NULL);
+  dcomplex os_r, os_d;
+  CalcOStrength(w1s, r1, d1, &os_r, &os_d);
+  cout << endl;
+  cout << "oscillator strength" <<endl;
+  cout << os_r << ", " << os_d << endl;
   BOOST_FOREACH(Irrep irr, irreps) {
     muphi_psi1[irr] = 0.0;
     muphi_psi1_v[irr] = 0.0;
@@ -1532,14 +1621,19 @@ void CalcBraket_eigen(const map<int, BVec>& eig0,
     }
   }
 }
+void PrintWloop(dcomplex w) {
+  cout << "calculation at...." << endl;
+  cout << "w_eV: " << w * au2ev << endl;
+  cout << "w_au: " << w << endl;
+  cout << "E_eV: " << (w + E0) * au2ev << endl;
+  cout << "E_au: " << w + E0 << endl;
+  cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
+}
 void Calc_One_Eigen() {
 
   map<int, BMat> U0;
   map<int, BVec> eig0, r0, d0, s0;
   Solve_0th(&U0, &eig0, &r0, &d0, &s0);
-
-  cout << "r0(L=1): " << endl;
-  cout << r0.at(1) << endl;
   
   BMat U1;
   BVec w1, r1, d1;
@@ -1551,12 +1645,7 @@ void Calc_One_Eigen() {
   // -- w loop --
   for(int iw = 0; iw < (int)w_list.size(); iw++) {
     double w = w_list[iw];
-    cout << "calculation at...." << endl;
-    cout << "w_eV: " << w * au2ev << endl;
-    cout << "w_au: " << w << endl;
-    cout << "E_eV: " << (w + E0) * au2ev << endl;
-    cout << "E_au: " << w + E0 << endl;
-    cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
+    PrintWloop(w);
     CalcBraket_eigen(eig0, r0, d0, s0,		   
 		     w1, r1, d1, V, U, w);
     CalcMain_alpha(iw);
@@ -1564,8 +1653,30 @@ void Calc_One_Eigen() {
   }
   
 }
+void Calc_STEX_Eigen() {
+
+  map<int, BMat> U0;
+  map<int, BVec> eig0, r0, d0, s0;
+  Solve_0th(&U0, &eig0, &r0, &d0, &s0);
+
+  BMat U1;
+  BVec w1, r1, d1;
+  Solve_1st_STEX(&U1, &w1, &r1, &d1);
+
+  map<int, BMat> V, U;
+  Calc_V_STEX(U0, U1, &V, &U);
+
+  for(int iw = 0; iw < (int)w_list.size(); iw++) {
+    double w = w_list[iw];
+    PrintWloop(w);
+    CalcBraket_eigen(eig0, r0, d0, s0,
+		     w1, r1, d1, V, U, w);
+    CalcMain_alpha(iw);
+    CalcMain(iw);
+  }  
+}
 void Calc_RPA_Eigen_HF() {
-  
+
   map<int, BMat> U0;
   map<int, BVec> eig0, r0, d0, s0;
   Solve_0th(&U0, &eig0, &r0, &d0, &s0);
@@ -1573,7 +1684,7 @@ void Calc_RPA_Eigen_HF() {
   CalcRPA rpa;
   BMat U1_HF;
   BVec r1_RPA, d1_RPA;
-  Solve_RPA(&rpa, &U1_HF, &r1_RPA, &d1_RPA);
+  Solve_1st_RPA(&rpa, &U1_HF, &r1_RPA, &d1_RPA);
 
   map<int, BMat> V, U;
   Calc_V_RPA(U0, rpa, U1_HF, &V, &U);
@@ -1581,18 +1692,16 @@ void Calc_RPA_Eigen_HF() {
   // -- w loop --
   for(int iw = 0; iw < (int)w_list.size(); iw++) {
     double w = w_list[iw];
-    cout << "w_eV: " << w * au2ev << endl;
-    cout << "w_au: " << w << endl;
-    cout << "E_eV: " << (w + E0) * au2ev << endl;
-    cout << "E_au: " << w + E0 << endl;
-    cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
+    PrintWloop(w);
     CalcBraket_eigen(eig0, r0, d0, s0,		   
-		     rpa.w, r1_RPA, d1_RPA, V, U, 1.1);
+		     rpa.w, r1_RPA, d1_RPA, V, U, w);
     CalcMain_alpha(iw);
-    //    CalcMain(iw);
+    CalcMain(iw);
   }
-  
-  /*
+
+  PrintOut();
+}
+void Calc_RPA_Eigen_HF_old() {
   // -- AO basis --
   CalcSTVMat(basis1, basis1, &S1, &T1, &V1);
   B2EInt eri_J_11 = CalcERI(basis1, basis1, basis0, basis0, eri_method);
@@ -1619,14 +1728,14 @@ void Calc_RPA_Eigen_HF() {
   Irrep x = sym->irrep_x();
   Irrep y = sym->irrep_y();
   Irrep z = sym->irrep_z();
-  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, s1_ao, aD1_ao;
+  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, s1_ao, sD1_ao;
   CalcDipMat(basis1, basis0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
   s1_ao(x,0) = X1i(x,0); sD1_ao(x,0) = DX1i(x,0);
   s1_ao(y,0) = Y1i(y,0); sD1_ao(y,0) = DY1i(y,0);
-  s1_ao(y,0) = Z1i(z,0); sD1_ao(z,0) = DZ1i(z,0);
+  s1_ao(z,0) = Z1i(z,0); sD1_ao(z,0) = DZ1i(z,0);
   BMat s1_HF, sD1_HF;
-  BMatCtAC(U_HF_1, U_HF_0, s1_ao, &s1);
-  BMatCtAC(U_HF_1, U_HF_0, sD1_ao, &sD1);
+  BMatCtAD(U_HF_1, U_HF_0, s1_ao, &s1_HF);
+  BMatCtAD(U_HF_1, U_HF_0, sD1_ao, &sD1_HF);
 
   // --dipole (RPA) --
   
@@ -1638,68 +1747,15 @@ void Calc_RPA_Eigen_HF() {
   BVec s1_RPA, sD1_RPA;
   rpa.CalcOneInt(s1_HF,  &s1_RPA, true);
   rpa.CalcOneInt(sD1_HF, &sD1_RPA, false);
-  
-  // -- zeroth order wave function --
-  map<int, BVec> eig0_L;
-  map<int, BVec> s0_chi_L;
-  map<int, BVec> s0_L, sD0_L;
-  map<int, BMat> V_L, CV_L;
-  BOOST_FOREACH(int L, Ls) {
-    BMat S, H, V, U0;
-    CalcSTVMat(basis_psi0_L[L], basis_psi0_L[L], &S, &H, &V);
-    H.Add(1.0, V);
-    BMatEigenSolve(H, S, &U0, &eig0_L[L]);
 
-    BMat b0_chi; CalcSMat(basis_psi0_L[L], basis_chi0_L[L], &b0_chi);
-    BOOST_FOREACH(Irrep irr, irreps) {
-      s0_chi_L[L](irr) = U0(irr,irr).transpose() * b0_chi(irr,irr).col(0);
-    }
-
-    BVec s0_L_ao, sD0_L_ao;
-    BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i;
-    CalcDipMat(basis_psi0_L[L], basis0,
-	       &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
-    s0_L_ao[L](x) = X1i(x, 0) * c0; sD0_L_ao[L](x) = DX1i(x, 0) * c0; 
-    s0_L_ao[L](y) = Y1i(y, 0) * c0; sD0_L_ao[L](y) = DY1i(y, 0) * c0; 
-    s0_L_ao[L](z) = Z1i(z, 0) * c0; sD0_L_ao[L](z) = DZ1i(z, 0) * c0;
-    BVecCtx(U0, s0_L_ao[L], &s0_L[L]);
-    BVecCtx(U0, sD0_L_ao[L], &sD0_L[L]);
-    
-    BMat H01,  H01_0;
-    BMat CH01, CH01_0;
-    SymGTOs b0L = basis_psi0_L[L];
-    SymGTOs cb0L = basis_psi0_L[L];
-    CalcSTEXHamiltonian(b0L,  basis1, basis0, mole, 0, c0, &H01);
-    CalcSTEXHamiltonian(cb0L, basis1, basis0, mole, 0, c0, &CH01);
-    CalcCoreHamiltonian(b0L,  mole0, basis1, &H01_0);
-    CalcCoreHamiltonian(b0L,  mole0, basis1, &CH01_0);
-
-    BVec V01, CV01;
-    Copy(H01,  V01);  V01.Add( -1.0, H01_0);
-    Copy(CH01, CV01); CV01.Add(-1.0, CH01_0);    
-    CtAD(&U0_L[L], U_HF_1, &V01);
-    CaAD(&U0_L[L], U_HF_1, &CV01);
-
-    BOOST_FOREACH(Irrep irr, irreps) {
-      int n0 = basis_psi0_L[L]->size_basis_isym(irr);
-      int n1 = basis1->size_basis_isym(irr);
-      for(int i = 0; i < n0; i++) {
-	for(int I = 0; I < n1; I++) {
-	  dcomplex acc(0), c_acc(0);	  
-	  for(int j = 0; j < n1; j++) {
-	    dcomplex coef = rpa.Z(irr,irr)(j,I)+rpa.Y(irr,irr)(j,I);
-	    acc += V01(irr,irr)(i,j) * coef;
-	    c_acc += CV01(irr,irr)(i,j) * coef;	      
-	  }
-	  V_L[L](irr,irr) = acc;
-	  CV_L[L](irr,irr) = c_acc;
-	}
-      }
-    }
-  }
+  // check OS --
+  dcomplex os_r, os_d;
+  CalcOStrength(rpa.w, s1_RPA, sD1_RPA, &os_r, &os_d);
+  cout << endl;
+  cout << "oscillator strength" <<endl;
+  cout << os_r << ", " << os_d << endl;
 
   // -- w loop --
-  int ms[3]; ms[0]=+1; ms[1]=-1; ms[2]=0;
   for(int iw = 0; iw < (int)w_list.size(); iw++) {
     double w = w_list[iw];
     cout << "w_eV: " << w * au2ev << endl;
@@ -1707,60 +1763,21 @@ void Calc_RPA_Eigen_HF() {
     cout << "E_eV: " << (w + E0) * au2ev << endl;
     cout << "E_au: " << w + E0 << endl;
     cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
-
     BOOST_FOREACH(Irrep i, irreps) {
       muphi_psi1[i] = 0.0;
       muphi_psi1_v[i] = 0.0;
-      int n = basis1->size_basis_isym(i);
+      int n = rpa.w(i).size();
       for(int I = 0; I < n; I++) {
-	dcomplex dl = s1_RPA( i)(I);
-	dcomplex dv = sD1_RPA(i)(I);
+	dcomplex dl = s1_RPA( i)(I); 
+	dcomplex dv = sD1_RPA(i)(I); 
 	dcomplex wi = rpa.w(i)(I);
-	muphi_psi1[i]   += dl*dl/(w-wi);
-	muphi_psi1_v[i] += dv*dv/(w-wi);
-      }
-    }
-    BOOST_FOREACH(int L, Ls) {
-      for(int im = 0; im < 3; im++) {
-	Irrep irr = irreps[im];
-	int m = ms[im];
-	impsi0_muphi(L, m) = 0.0; impsi0_muphi_v(L, m) = 0.0;
-	impsi0_chi(L,m) = 0.0;
-	int n0 = basis_psi0_L[L]->size_basis_isym(irr);
-	int n1 = basis_psi1_L[L]->size_basis_isym(irr);
-	impsi0_muphi(L,m) = 0.0;
-	for(int i = 0; i < n0; i++) {
-	  dcomplex s0chi(s0_chi_L[L](irr,irr)(i,0));
-	  dcomplex cs0chi(s0chi.conjugate());
-	  dcomplex s0i(s0_L[L](irr(i)));
-	  dcomplex sD0i(sD0_L[L](irr(i)));
-	  dcomplex e0i(eig0_L[L](irr)(i));
-	  dcomplex ce0i(e0i.conjugate());
-	  impsi0_muphi(L,m) += (s0chi*s0i/(ene-e0i)).imag();
-	  impsi0_muphi_v(L,m) += (s0chi*sD0i/(ene-e0i)).imag();
-	  impsi0_chi(L,m) += s0chi;
-	  for(int I = 0; I < n1; I++) {
-	    dcomplex ViI = V_L[L](irr,irr)(i,I);
-	    dcomplex CViI = CV_L[L](irr,irr)(i,I);
-	    dcomplex dlI = s1_RPA(irr)(I);
-	    dcomplex dvI = sD1_RPA(irr)(I);
-	    dcomplex wI = rpa.w(irr)(I);
-	    impsi0_v_psi1(L,m)  +=
-	      (+s0chi  * ViI  * dlI / ((ene-e0i)*(w-wI))	       
-	       -cs0chi * CViI * dlI / ((ene-ce0i)*(w-wI))) / i2;
-	    impsi0_v_psi1_v(L,m)  +=
-	      (+s0chi  * ViI  * dvI / ((ene-e0i)*(w-wI))	       
-	       -cs0chi * CViI * dvI / ((ene-ce0i)*(w-wI))) / i2;
-	  }
-	}
+	
+	muphi_psi1[i]   += dl*dl/(w-wi) /3.0*(1.0*ne);
+	muphi_psi1_v[i] += dv*dv/(w-wi) / 3.0 * (1.0*ne);;
       }
     }
     CalcMain_alpha(iw);
-    //    CalcMain(iw);
   }
-  PrintOut();
-  */
-
   
 }
 
@@ -1776,6 +1793,11 @@ int main(int argc, char *argv[]) {
 
   if(calc_type == "RPA" and solve_driv_type == "eigen_value") {
     Calc_RPA_Eigen_HF();
+    //Calc_RPA_Eigen_HF_old();
+    return 0;
+  }
+  if(calc_type == "STEX" and solve_driv_type == "eigen_value") {
+    Calc_STEX_Eigen();
     return 0;
   }
   if(calc_type == "one" and solve_driv_type == "eigen_value") {

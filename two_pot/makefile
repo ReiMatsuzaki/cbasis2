@@ -142,9 +142,6 @@ check_stex: ${BINDIR}/two_pot
 check_rpa: ${BINDIR}/two_pot
 	@echo RPA
 	./$^ h2_rpa_small.json
-#	@echo
-#	@echo STEX
-#	./$^ h2_stex_small.json > h2_stex_small.out
 
 ## ==== Basic command ====
 clean:

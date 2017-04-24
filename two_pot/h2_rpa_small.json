@@ -9,9 +9,6 @@
     "Z": 1.0,
     "ws": [1.20263],
     "eri_method" : {"symmetry": 1, "memo": 1, "perm": 0},
-    "write_psi": {"file": "tmppsi.csv",
-		  "rs": {"type": "lin", "x0": 0.0, "x1": 100.0, "N": 101},
-		  "lmax": 5},
     "sym": "D2h",    
     "molecule": [
 	{"atom": "H",   "q": 1.0, "xyz": [[0,0,0.7]]},

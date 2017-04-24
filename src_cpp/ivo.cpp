@@ -248,8 +248,8 @@ namespace cbasis {
       Irrep irr_a = k.first;
       Irrep irr_b = k.second;
       const MatrixXcd& xmat = it->second;
-      const MatrixXcd& Zmat(Z(irr_a, irr_a));
-      const MatrixXcd& Ymat(Y(irr_a, irr_a));
+      const MatrixXcd& Zmat(Z(irr_b, irr_b));
+      const MatrixXcd& Ymat(Y(irr_b, irr_b));
       int ni = xmat.rows();
       int nI = Zmat.cols();
       int nj = Zmat.rows();
@@ -257,14 +257,14 @@ namespace cbasis {
 	THROW_ERROR("size mismatch");
       }      
       (*y)(irr_a, irr_a) = MatrixXcd::Zero(ni, nI);
-      MatrixXcd& ymat = (*y)(irr_a, irr_a);
+      
       for(int I = 0; I < nI; I++) {
 	for(int i = 0; i < ni; i++) {
 	  dcomplex acc(0);
 	  for(int j = 0; j < nj; j++) {
 	    acc += xmat(i, j)*Ymat(j,I)* + sign*xmat(i, j)*Zmat(j, I);	    
 	  }
-	  ymat(i, I) += acc;
+	  (*y)(irr_a, irr_a)(i, I) = acc;
 	}
       }
     }    

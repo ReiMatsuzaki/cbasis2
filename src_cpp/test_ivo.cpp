@@ -16,142 +16,6 @@ using namespace Eigen;
 using boost::format;
 using namespace boost::assign;
 
-
-class TestPracticeTwoPot : public ::testing::Test {
-public:
-  // basis
-  SymGTOs us_g, us_0, us_1;
-  ERIMethod method;
-
-  // ground state
-  MO mo_g;
-  const static Irrep irr0=0;
-  BMat U_g;
-  VectorXcd c0_g;
-  BVec E_g;
-
-  // first order wave function
-  BMat U_HF_1;
-  CalcRPA rpa; // contain Y,Z,wi
-
-  // 0th order wave function
-  BVec eig0;
-  BMat U_0;
-    
-  void PrepareBasis() {
-    
-    // -- symmetry --
-    SymmetryGroup sym = SymmetryGroup_D2h();
-
-    // -- target molecule --
-    Molecule mole = NewMolecule(sym);
-    mole->Add(NewAtom("He", 2.0)->Add(0,0,0));
-    Molecule mole0 = NewMolecule(sym);
-    mole0->Add(NewAtom("dum", 1.0)->Add(0,0,0));
-       
-    // -- basis for ground state --
-    us_g = NewSymGTOs(mole);
-    VectorXcd zeta_s(10);
-    //    zeta_s << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053, 30.17990, 108.7723, 488.8941, 3293.694;
-    zeta_s << 0.107951, 0.552610, 3.522261, 30.17990, 488.8941;  
-    us_g->NewSub("He").SolidSH_M(0,0,zeta_s);
-    us_g->SetUp();
-    
-    // -- basis for excited state --
-    VectorXcd zs(8);
-    //zs << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053, 30.17990, 108.7723;
-    zs << 0.240920, 1.352436, 9.789053, 108.7723;
-    us_1 = NewSymGTOs(mole);
-    us_1->NewSub("He").SolidSH_M(1, 0, zs);
-    us_1->NewSub("He").SolidSH_M(1, -1, zs);
-    us_1->NewSub("He").SolidSH_M(1, +1, zs);
-    us_1->SetUp();
-
-    // -- basis for zeroth --
-    us_0 = NewSymGTOs(mole0);
-    us_0->NewSub("dum").SolidSH_M(1, 0, zs);
-    us_0->NewSub("dum").SolidSH_M(1, -1, zs);
-    us_0->NewSub("dum").SolidSH_M(1, +1, zs);
-    us_0->SetUp();
-
-    // -- other --
-    method.set_symmetry(1); method.set_coef_R_memo(1);
-
-  }
-  void Solve_ground() {
-    // ==== HF for ground state ====
-    SCFOptions opts; opts.max_iter = 10;
-    
-    bool conv;
-    mo_g = CalcRHF(us_g, 2, method, opts, &conv);
-    if(not conv) {
-      cout << "failed to conversion" << endl;
-    }
-    U_g = mo_g->C;
-    c0_g = U_g(irr0, irr0).col(0);
-    E_g = mo_g->eigs;
-  }
-  void Solve_first () {
-    // ==== Eigen values for first psi ====    
-    Molecule mole = us_1->molecule();
-    // -- AO --
-    BMat S1, T1, V1;
-    CalcSTVMat(us_1, us_1, &S1, &T1, &V1);
-    B2EInt eri_J_11 = CalcERI(us_1, us_1, us_0, us_0, method);
-    B2EInt eri_K_11 = CalcERI(us_1, us_0, us_0, us_1, method);
-    BMat K1; Copy(S1, K1); K1.SetZero();
-    AddK(eri_K_11, c0_g, 0, 1.0, K1);
-    // -- HF --
-    BMat H_HF_1;
-    CalcFock(T1, V1, 0, c0_g, eri_J_11, eri_K_11, &H_HF_1);
-    BVec eig_HF_1;
-    BMatEigenSolve(H_HF_1, S1, &U_HF_1, &eig_HF_1);
-    // -- RPA eigen system --
-    BMat H_IVO_1;
-    CalcSTEXHamiltonian(T1, V1, irr0, c0_g, eri_J_11, eri_K_11, &H_IVO_1);
-    CalcRPA rpa;
-    rpa.CalcH_HF(H_IVO_1, E_g(irr0)(0), K1, eig_HF_1, U_HF_1);
-    rpa.SolveEigen();
-    // -- dipole moment
-    SymmetryGroup sym = us_1->sym_group();    
-    Irrep x = sym->irrep_x();
-    Irrep y = sym->irrep_y();
-    Irrep z = sym->irrep_z();
-    BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, s1_ao, sD1_ao;
-    CalcDipMat(us_1, us_g, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
-    s1_ao(x,0) = X1i(x,0); sD1_ao(x,0) = DX1i(x,0);
-    s1_ao(y,0) = Y1i(y,0); sD1_ao(y,0) = DY1i(y,0);
-    s1_ao(z,0) = Z1i(z,0); sD1_ao(z,0) = DZ1i(z,0);
-    BMat r1g_HF, d1g_HF;
-    BMatCtAD(U_HF_1, U_g, s1_ao, &r1g_HF);
-    BMatCtAD(U_HF_1, U_g, sD1_ao, &d1g_HF);
-    BVec r1_RPA, d1_RPA;
-    rpa.CalcOneInt(r1g_HF,  &r1_RPA, true);
-    rpa.CalcOneInt(d1g_HF, &d1_RPA, false);
-    
-
-    
-  }
-  void Solve_zero() {
-    // -- AO --
-    BMat S, T, H;
-    CalcSTVMat(us_0, us_0, &S, &T, &H);
-    H.Add(1.0, T);
-    BMatEigenSolve(H, S, &U_0, &eig0);
-  }
-  void Solve() {
-    this->Solve_ground();
-    this->Solve_first();
-  }
-  TestPracticeTwoPot() {
-    this->PrepareBasis();
-    this->Solve();
-  }
-};
-TEST_F(TestPracticeTwoPot, first) {
-
-}
-
 class TestIVO : public ::testing::Test {
 public:  
   SymGTOs us_0;
@@ -198,9 +62,20 @@ public:
     E0 = mo_0->eigs(0)(0);
     
     // -- basis for excited state --
-    VectorXcd zs(8);
-    zs << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053,
-      30.17990, 108.7723;
+    VectorXcd zs(13);
+    zs << dcomplex(0.0812755955262,  -0.0613237786222),
+      dcomplex(0.00497147387796, -0.0113737972763),
+      dcomplex(0.0323712622673,  -0.0451300037076),
+      dcomplex(0.00317417887792, -0.022582254987),
+      dcomplex(0.0118391719646,  -0.0327847352576),      
+      0.01, 0.0313856656, 
+      0.09850600051550235, 
+      0.30916763917729845, 
+      0.970343213756015, 3.045486762417561,
+      9.558462911446421,
+      29.999872058865982;
+    //zs << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053,
+    //      30.17990, 108.7723;
     us_1 = NewSymGTOs(mole);
     us_1->NewSub("He").SolidSH_M(1, 0, zs);
     us_1->NewSub("He").SolidSH_M(1, -1, zs);
