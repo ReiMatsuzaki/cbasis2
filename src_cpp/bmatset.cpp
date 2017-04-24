@@ -549,7 +549,9 @@ namespace cbasis {
       for(It itd = D.begin(); itd != D.end(); ++itd) {
 	Key kc = itc->first;
 	Key kd = itd->first;
-	if(not A.has_block(kc.first, kd.first)) {	  
+	if(not A.has_block(kc.first, kd.first)) {
+	  continue;
+	  /*
 	  cout << "C:" << endl;
 	  C.SimplePrint();
 	  cout << "A:" << endl;
@@ -557,7 +559,8 @@ namespace cbasis {
 	  cout << "D:" << endl;
 	  D.SimplePrint();
 	  THROW_ERROR("structure mismatch");
-	    }
+	  */
+	}
 	if(not res->has_block(kc.second, kd.second)) {
 	  int n = itc->second.cols();
 	  int m = itd->second.cols();
@@ -596,6 +599,67 @@ namespace cbasis {
 	}
       }
     }
+    
+  }
+  void BMatCaAD(const BMat& C, const BMat& D, const BMat& A, BMat *res) {
+ 
+    if(not C.is_block_diagonal()) {
+      THROW_ERROR("C must be block diagonal");      
+    }
+    if(not D.is_block_diagonal()) {
+      THROW_ERROR("D must be block diagonal");      
+    }
+    
+    typedef BMat::const_iterator It;
+    typedef BMat::Key Key;
+
+    // -- check structure and store memory --
+    for(It itc = C.begin(); itc != C.end(); ++itc) {
+      for(It itd = D.begin(); itd != D.end(); ++itd) {
+	Key kc = itc->first;
+	Key kd = itd->first;
+	if(not A.has_block(kc.first, kd.first)) {
+	  continue;
+	}
+	if(not res->has_block(kc.second, kd.second)) {
+	  int n = itc->second.cols();
+	  int m = itd->second.cols();
+	  (*res)(kc.second, kd.second) = MatrixXcd::Zero(n, m);
+	}
+      }
+    }
+
+    // -- calcualtion --
+    for(It itc = C.begin(); itc != C.end(); ++itc) {
+      for(It ita = A.begin(); ita != A.end(); ++ita) {
+	for(It itd = D.begin(); itd != D.end(); ++itd) {
+	  Key kc = itc->first;
+	  Key ka = ita->first;
+	  Key kd = itd->first;
+	  const MatrixXcd& mc = itc->second;
+	  const MatrixXcd& ma = ita->second;
+	  const MatrixXcd& md = itd->second;
+	  if(kc.first == ka.first and ka.second == kd.first) {
+	    Key kres(kc.second, kd.second);
+	    try {
+	      CaAD(mc, md, ma, &(*res)[kres]);
+	    } catch(exception& e) {
+	      stringstream ss;
+	      ss << "error on CtAD on each matrix\n";
+	      ss << format("C(%s) at (%d, %d)\n")
+		% C.get_name() % kc.first % kc.second;		
+	      ss << format("A(%s) at (%d, %d)\n")
+		% A.get_name() % ka.first % ka.second;
+	      ss << format("D(%s) at (%d, %d)\n")
+		% D.get_name() % kd.first % kd.second;
+	      ss << e.what();
+	      THROW_ERROR(ss.str());
+	    }
+	  }
+	}
+      }
+    }
+    
   }
   void BMatCtA(const BMat& C, const BMat& A, BMat *res) {
     BMat S;
@@ -693,6 +757,16 @@ namespace cbasis {
     Copy(H, S);
     S.SetId();
     BMatEigenSolve(H, S, C, E);
+  }
+  void BMatCol(const BMat& A, int irr, int i, BVec *x) {
+    typedef BMat::const_iterator It;
+    for(It it = A.begin(); it != A.end(); ++it) {
+      BMat::Key k = it->first;
+      const MatrixXcd& mA = it->second;
+      if(k.second == irr) {
+	(*x)[k.first] = mA.col(i);
+      }
+    }
   }
   // ==== BlockMatrixSets ====
   _BMatSet::_BMatSet(): block_num_(1) {}

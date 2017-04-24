@@ -1,18 +1,31 @@
 #ifndef IVO_H
 #define IVO_H
 
+#include "symmolint.hpp"
 #include "symgroup.hpp"
 #include "bmatset.hpp"
 #include "b2eint.hpp"
 
 namespace cbasis {
-  
+
+  void CalcCoreHamiltonian(SymGTOs basis_a, Molecule mole, SymGTOs basis_b, BMat *H);
   void CalcFock(const BMat& T, const BMat& V,
 		Irrep irr0, const Eigen::VectorXcd& c0,
 		B2EInt eri_J, B2EInt eri_K, BMat *H);
   void CalcSTEXHamiltonian(const BMat& T, const BMat& V,
 			   Irrep irrep0, const Eigen::VectorXcd& c0,
 			   B2EInt eri_J, B2EInt eri_K, BMat *H);
+  void CalcSTEXHamiltonian(const BMat& T, const BMat& V,
+			   Irrep irrep0, const BMat& C0, int num_oo,
+			   B2EInt eri_J, B2EInt eri_K, BMat *H);  
+  void CalcSTEXHamiltonian(SymGTOs basis_a, SymGTOs basis_b , SymGTOs basis_0,
+			   Molecule mole,
+			   Irrep irrep0, const Eigen::VectorXcd& c0,
+			   BMat *H);
+  void CalcSTEXHamiltonian(SymGTOs basis_a, SymGTOs basis_b , SymGTOs basis_0,
+			   Molecule mole,
+			   Irrep irrep0, const BMat& C, int num_oo, ERIMethod m,
+			   BMat *H);    
   class CalcRPA {
   public:
     // -- intermediate --
@@ -37,6 +50,8 @@ namespace cbasis {
     void SolveEigen();
     dcomplex CalcYZNorm(Irrep irr, int I);
     void CalcOneInt(const BVec& z_HF, BVec *z_RPA, bool symmetric);
+    void CalcOneInt(const BMat& z_HF, BVec *z_RPA, bool symmetric);
+    void CalcOneIntRight(const BMat& x, BMat *y, bool symmetric) const;
   };
 }
 

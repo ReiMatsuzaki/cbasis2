@@ -111,11 +111,12 @@ namespace cbasis {
   void BMatSqrt(const BMat& a, BMat& b);
   void BMatCtAC(const BMat& C, const BMat& A, BMat *res);
   void BMatCtAD(const BMat& C, const BMat& D, const BMat& A, BMat *res);
+  void BMatCaAD(const BMat& C, const BMat& D, const BMat& A, BMat *res);
   void BMatCtA(const BMat& C, const BMat& A, BMat *res);
   void BVecCtx(const BMat& C, const BVec& x, BVec *y);
   void BMatEigenSolve(const BMat& H, const BMat& S, BMat *C, BVec *E);
   void BMatEigenSolve(const BMat& H, BMat *C, BVec *E);
-  
+  void BMatCol(const BMat& A, int irr, int i, BVec *x);
   // ==== Old ====
   void BMatRead(BMat::Map& bmat, std::string fn);
   void BMatWrite(BMat::Map& bmat, std::string fn);

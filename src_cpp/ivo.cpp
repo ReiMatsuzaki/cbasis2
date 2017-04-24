@@ -1,11 +1,19 @@
 #include "ivo.hpp"
 #include "../utils/eigen_plus.hpp"
+#include "one_int.hpp"
+#include "two_int.hpp"
 #include "mo.hpp"
 
 using namespace Eigen;
 
 namespace cbasis {
-  
+  void CalcCoreHamiltonian(SymGTOs basis_a, Molecule mole, SymGTOs basis_b, BMat *H) {
+    BMat S,T,V;
+    CalcSTMat(basis_a, basis_b, &S, &T);
+    CalcVMat(basis_a, mole, basis_b, &V);
+    Copy(T, *H);
+    H->Add(1.0, V);
+  }      
   void CalcFock(const BMat& T, const BMat& V,
 		Irrep irr0, const Eigen::VectorXcd& c0,
 		B2EInt eri_J, B2EInt eri_K, BMat *H) {
@@ -39,6 +47,39 @@ namespace cbasis {
     AddJ(eri_J, c0, irrep0, 1.0, *H);
     AddK(eri_K, c0, irrep0, 1.0, *H);
 
+  }
+  void CalcSTEXHamiltonian(const BMat& T, const BMat& V,
+			   Irrep irrep0, const BMat& C0, int num_oo,
+			   B2EInt eri_J, B2EInt eri_K, BMat *H) {
+    VectorXcd c0 = C0(irrep0, irrep0).col(0);
+    CalcSTEXHamiltonian(T, V, irrep0, c0, eri_J, eri_K, H);
+  }
+  void CalcSTEXHamiltonian(SymGTOs basis_a, SymGTOs basis_b , SymGTOs basis_0, Molecule mole,
+			   Irrep irrep0, const Eigen::VectorXcd& c0,
+			   ERIMethod m,
+			   BMat *H) {
+
+    BMat S, T, V;
+    CalcSTMat(basis_a, basis_b, &S, &T);
+    CalcVMat(basis_a, mole, basis_b, &V);
+    B2EInt eri_J = CalcERI(basis_a, basis_b, basis_0, basis_0, m);
+    B2EInt eri_K = CalcERI(basis_a, basis_0, basis_0, basis_b, m);
+    CalcSTEXHamiltonian(T, V, irrep0, c0, eri_J, eri_K, H);
+    
+  }
+  void CalcSTEXHamiltonian(SymGTOs basis_a, SymGTOs basis_b , SymGTOs basis_0,
+			   Molecule mole,
+			   Irrep irrep0, const BMat& C, int num_oo,
+			   ERIMethod m,
+			   BMat *H) {
+    if(num_oo != 1) {
+      THROW_ERROR("only support for num_oo == 1 ");
+    }
+
+    Eigen::VectorXcd c0 = C(irrep0, irrep0).col(0);
+    CalcSTEXHamiltonian(basis_a, basis_b, basis_0, mole, irrep0,
+			c0, m, H);
+    
   }
   CalcRPA::CalcRPA() {
     A.set_name("A");
@@ -171,5 +212,62 @@ namespace cbasis {
 	}
       }
     }      
-  }  
+  }
+  void CalcRPA::CalcOneInt(const BMat& z_HF, BVec *z_RPA, bool symmetric) {
+    
+    double sign = (symmetric ? 1.0 : -1.0);
+    typedef BMat::const_iterator It;
+    for(It it = z_HF.begin(); it != z_HF.end(); ++it) {
+      BMat::Key k = it->first;
+      Irrep irr_a = k.first;
+      //      Irrep irr_b = k.second;
+      const MatrixXcd& z = it->second;
+      const MatrixXcd& ZZ(Z(irr_a, irr_a));
+      const MatrixXcd& YY(Y(irr_a, irr_a));
+      int nI = ZZ.cols();
+      int ni = ZZ.rows();
+      (*z_RPA)(irr_a) = VectorXcd::Zero(nI);
+      VectorXcd& zz = (*z_RPA)(irr_a);
+      for(int I = 0; I < nI; I++) {
+	for(int i = 0; i < ni; i++) {
+	  zz(I) += YY(i,I)*z(i, 0) + sign*ZZ(i, I)*z(i, 0);
+	}
+      }
+    }    
+  }
+  void CalcRPA::CalcOneIntRight(const BMat& x, BMat *y, bool symmetric) const{
+
+    /**
+       sum_j x_ij (Y_jI +- Z_jI)
+     */
+    
+    double sign = (symmetric ? 1.0 : -1.0);
+    typedef BMat::const_iterator It;
+    for(It it = x.begin(); it != x.end(); ++it) {
+      BMat::Key k = it->first;
+      Irrep irr_a = k.first;
+      Irrep irr_b = k.second;
+      const MatrixXcd& xmat = it->second;
+      const MatrixXcd& Zmat(Z(irr_a, irr_a));
+      const MatrixXcd& Ymat(Y(irr_a, irr_a));
+      int ni = xmat.rows();
+      int nI = Zmat.cols();
+      int nj = Zmat.rows();
+      if(xmat.cols() != nj) {
+	THROW_ERROR("size mismatch");
+      }      
+      (*y)(irr_a, irr_a) = MatrixXcd::Zero(ni, nI);
+      MatrixXcd& ymat = (*y)(irr_a, irr_a);
+      for(int I = 0; I < nI; I++) {
+	for(int i = 0; i < ni; i++) {
+	  dcomplex acc(0);
+	  for(int j = 0; j < nj; j++) {
+	    acc += xmat(i, j)*Ymat(j,I)* + sign*xmat(i, j)*Zmat(j, I);	    
+	  }
+	  ymat(i, I) += acc;
+	}
+      }
+    }    
+    
+  }
 }
