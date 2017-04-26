@@ -91,6 +91,7 @@ namespace cbasis {
     H.set_name("H");
     U.set_name("U");
     w2.set_name("w2");
+    is_ortho = true;
     w.set_name("w");
     Y.set_name("Y");
     Z.set_name("Z");
@@ -105,6 +106,7 @@ namespace cbasis {
     H.set_name(name+"_H");
     U.set_name(name+"_U");
     w2.set_name(name+"_w2");
+    is_ortho = true;
     w.set_name(name+"_w");
     Y.set_name(name+"_Y");
     Z.set_name(name+"_Z");
@@ -115,6 +117,24 @@ namespace cbasis {
     BMatSqrt(AmB, sqrt_AmB);
     BMatInvSqrt(AmB, inv_sqrt_AmB);
     Multi3(sqrt_AmB, ApB, sqrt_AmB, H);
+  }
+  void CalcRPA::SetS(const BMat& in_S) {
+    this->is_ortho = false;
+    Copy(in_S, S);
+  }
+  void CalcRPA::CalcH_AO(const BMat& H_IVO_AO, const BMat& S,
+			 dcomplex eig0_HF, const BMat& K) {
+    // -- A --
+    Copy(H_IVO_AO, A);
+    //    A.Add(-eig0_HF, S);
+    A.Shift(-eig0_HF);
+
+    // -- B --
+    Copy(K, B);
+
+    // -- H --
+    this->CalcH();
+    
   }
   void CalcRPA::CalcH_HF(const BMat& H_IVO_AO, dcomplex eig0_HF,
 			 const BMat& K,
@@ -145,7 +165,11 @@ namespace cbasis {
   void CalcRPA::SolveEigen() {
     
     // -- solve eigen value problem of RPA --
-    BMatEigenSolve(H, &U, &w2);
+    if(is_ortho) {
+      BMatEigenSolve(H, &U, &w2);
+    } else {
+      BMatEigenSolve(H, S, &U, &w2);
+    }
     BVecSqrt(w2, &w);
     
     // -- compute Y+Z and Y-Z --
@@ -235,7 +259,8 @@ namespace cbasis {
       }
     }    
   }
-  void CalcRPA::CalcOneIntRight(const BMat& x, BMat *y, bool symmetric) const{
+  void CalcRPA::CalcOneIntRight(const BMat& x, BMat *y, bool symmetric,
+				dcomplex cy, dcomplex cz) const{
 
     /**
        sum_j x_ij (Y_jI +- Z_jI)
@@ -262,7 +287,9 @@ namespace cbasis {
 	for(int i = 0; i < ni; i++) {
 	  dcomplex acc(0);
 	  for(int j = 0; j < nj; j++) {
-	    acc += xmat(i, j)*Ymat(j,I)* + sign*xmat(i, j)*Zmat(j, I);	    
+	    acc +=
+	      xmat(i, j)*cy*Ymat(j,I)
+	      + sign*xmat(i, j)*cz*Zmat(j, I);	    
 	  }
 	  (*y)(irr_a, irr_a)(i, I) = acc;
 	}

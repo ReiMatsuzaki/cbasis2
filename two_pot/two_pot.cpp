@@ -34,6 +34,7 @@ double au2mb = 5.291772 * 5.291772;
 // -- Input --
 string comment;
 string in_json, out_json, cs_csv;
+object obj;
 
 // -- Output --
 ofstream f_para;
@@ -251,7 +252,7 @@ void Parse() {
     value json; f >> json;
     if(not json.is<object>()) 
       throw runtime_error("invalid json file");
-    object& obj = json.get<object>();
+    obj = json.get<object>();
     comment = ReadJson<string>(obj, "comment");
     calc_type = ReadJson<string>(obj, "calc_type");
 
@@ -301,7 +302,7 @@ void Parse() {
     }
     ne = ReadJson<int>(obj, "num_ele");
 
-    if(calc_type == "STEX" or calc_type == "RPA") {
+    if(calc_type == "STEX" or calc_type == "RPA" or calc_type == "propagator") {
       eri_method = ReadJson<ERIMethod>(obj, "eri_method");
     }
     sym     = ReadJson<SymmetryGroup>(obj, "sym");
@@ -1522,11 +1523,11 @@ void Calc_V_STEX(const map<int, BMat>& U0, const BMat& U1,
   }
   
 }
-void Calc_V_RPA(const map<int, BMat>& U0, 
+void Calc_V_RPA_STEX( const map<int, BMat>& U0, 
 		const CalcRPA& rpa, const BMat U1_HF, 
 		map<int, BMat> *v, map<int, BMat> *u) {
 
-  PrintTimeStamp("Calc_V_RPA", NULL);
+  PrintTimeStamp("Calc_V_RPA_STEX", NULL);
   BOOST_FOREACH(int L, Ls) {
 
     SymGTOs b0L =  basis_psi0_L[L];    
@@ -1540,7 +1541,7 @@ void Calc_V_RPA(const map<int, BMat>& U0,
     AddK(eri_K, c0, irrep0, 1.0, V1);
     BMat VV;
     BMatCtAD(U0.at(L), U1_HF, V1, &VV);
-    rpa.CalcOneIntRight(VV, &(*v)[L], true);
+    rpa.CalcOneIntRight(VV, &(*v)[L], true, 1.0, 1.0);
 
     SymGTOs cb0L =  basis_c_psi0_L[L];
     BMat CV1, CV0;
@@ -1553,8 +1554,92 @@ void Calc_V_RPA(const map<int, BMat>& U0,
     AddK(c_eri_K, c0, irrep0, 1.0, CV1);
     BMat UU;
     BMatCaAD(U0.at(L), U1_HF, CV1, &UU);
-    rpa.CalcOneIntRight(UU, &(*u)[L], true);
+    rpa.CalcOneIntRight(UU, &(*u)[L], true, 1.0, 1.0);
   
+  }
+  
+}
+void Calc_V_RPA_eigen(const map<int, BMat>& U0, const map<int, BVec>& eig0,		      
+		      const CalcRPA& rpa, const BMat U1_HF, 
+		      map<int, BMat> *v, map<int, BMat> *u) {
+
+  PrintTimeStamp("Calc_V_RPA_eigen", NULL);
+  BOOST_FOREACH(int L, Ls) {
+    
+    SymGTOs b0L = basis_psi0_L[L];
+    BMat S_ao;
+    CalcSMat(b0L, basis1, &S_ao);
+    BMat S_eig;
+    BMatCtAD(U0.at(L), U1_HF, S_ao, &S_eig);
+    BMat vv;
+    rpa.CalcOneIntRight(S_eig, &vv, true);
+
+    SymGTOs cb0L = basis_c_psi0_L[L];
+    BMat C_S_ao;
+    CalcSMat(cb0L, basis1, &C_S_ao);
+    BMat C_S_eig;
+    BMatCaAD(U0.at(L), U1_HF, C_S_ao, &C_S_eig);
+    BMat uu;
+    rpa.CalcOneIntRight(C_S_eig, &uu, true);
+
+    BOOST_FOREACH(Irrep irr, irreps) {
+      int n0 = b0L->size_basis_isym(irr);
+      int nI = rpa.w[irr].size();
+      for(int i = 0; i < n0; i++)
+	for(int I = 0; I < nI; I++) {
+	  dcomplex wi0 = eig0.at(L)(irr)(i) - E0;
+	  dcomplex wI1 = rpa.w(irr)(I);
+	  vv(irr,irr)(i, I) *= wI1-wi0;
+	  uu(irr,irr)(i, I) *= wI1-conj(wi0);
+	}
+    }
+    (*v)[L] = vv;
+    (*u)[L] = uu;
+  }
+
+}
+void Calc_V_RPA_RPA(const map<int, BMat>& U0, 
+		    const CalcRPA& rpa, const BMat U1_HF, 
+		    map<int, BMat> *v, map<int, BMat> *u) {
+  
+  PrintTimeStamp("Calc_V_RPA_RPA", NULL);
+  BOOST_FOREACH(int L, Ls) {
+
+    SymGTOs b0L =  basis_psi0_L[L];    
+    BMat V1, V0;
+    CalcVMat(b0L,  mole,  basis1, &V1);
+    CalcVMat(b0L,  mole0, basis1, &V0);    
+    B2EInt eri_J = CalcERI(b0L, basis1, basis0, basis0, eri_method);
+    B2EInt eri_K = CalcERI(b0L, basis0, basis0, basis1, eri_method);
+    V1.Add(-1.0, V0);
+    AddJ(eri_J, c0, irrep0, 1.0, V1);
+    AddK(eri_K, c0, irrep0, 1.0, V1);
+    BMat V_Y; BMatCtAD(U0.at(L), U1_HF, V1, &V_Y);
+    BMat V_Z; Copy(V1, V_Z); V_Z.SetZero();
+    AddK(eri_K, c0, irrep0, 1.0, V_Z);
+    BMat VV_Y, VV_Z;
+    rpa.CalcOneIntRight(V_Y, &VV_Y, true, 1.0, 0.0);
+    rpa.CalcOneIntRight(V_Z, &VV_Z, true, 0.0, 1.0);
+    Copy(VV_Y, (*v)[L]);
+    v->at(L).Add(1.0, VV_Z);
+
+    SymGTOs cb0L =  basis_c_psi0_L[L];
+    BMat CV1, CV0;
+    CalcVMat(cb0L, mole,  basis1, &CV1);    
+    CalcVMat(cb0L, mole0, basis1, &CV0);
+    B2EInt c_eri_J = CalcERI(cb0L, basis1, basis0, basis0, eri_method);
+    B2EInt c_eri_K = CalcERI(cb0L, basis0, basis0, basis1, eri_method);
+    CV1.Add(-1.0, CV0);
+    AddJ(c_eri_J, c0, irrep0, 1.0, CV1);
+    AddK(c_eri_K, c0, irrep0, 1.0, CV1);
+    BMat CV_Y; BMatCaAD(U0.at(L), U1_HF, CV1, &CV_Y);
+    BMat CV_Z; Copy(CV1, CV_Z); CV_Z.SetZero();
+    AddK(c_eri_K, c0, irrep0, 1.0, CV_Z);
+    BMat CVV_Y, CVV_Z;
+    rpa.CalcOneIntRight(CV_Y, &CVV_Y, true, 1.0, 0.0);
+    rpa.CalcOneIntRight(CV_Z, &CVV_Z, true, 0.0, 1.0);
+    Copy(CVV_Y, (*u)[L]);
+    u->at(L).Add(1.0, CVV_Z);    
   }
   
 }
@@ -1675,8 +1760,15 @@ void Calc_STEX_Eigen() {
     CalcMain(iw);
   }  
 }
-void Calc_RPA_Eigen_HF() {
+void Calc_RPA_HF() {
 
+  string eval_v = "STEX";
+  if(obj.find("RPA") != obj.end()) {
+    object& obj_rpa = obj["RPA"].get<object>();
+    eval_v = ReadJsonWithDefault<string>(obj_rpa, "eval_v", "STEX");    
+  }
+  cout << format("eval_v: %s\n") % eval_v;
+  
   map<int, BMat> U0;
   map<int, BVec> eig0, r0, d0, s0;
   Solve_0th(&U0, &eig0, &r0, &d0, &s0);
@@ -1686,8 +1778,22 @@ void Calc_RPA_Eigen_HF() {
   BVec r1_RPA, d1_RPA;
   Solve_1st_RPA(&rpa, &U1_HF, &r1_RPA, &d1_RPA);
 
+  cout << "RPA results" << endl;
+  cout << "Y:" << endl;
+  cout << rpa.Y << endl;
+  cout << "Z:" << endl;
+  cout << rpa.Z << endl;
+  
   map<int, BMat> V, U;
-  Calc_V_RPA(U0, rpa, U1_HF, &V, &U);
+  if(eval_v == "STEX") {
+    Calc_V_RPA_STEX(U0, rpa, U1_HF, &V, &U);
+  } else if(eval_v == "eigen") {
+    Calc_V_RPA_eigen(U0, eig0, rpa, U1_HF, &V, &U);
+  } else if(eval_v == "RPA") {
+    Calc_V_RPA_RPA(U0, rpa, U1_HF, &V, &U);
+  } else {
+    THROW_ERROR("unsupported RPA.eval_v");
+  }
 
   // -- w loop --
   for(int iw = 0; iw < (int)w_list.size(); iw++) {
@@ -1701,86 +1807,380 @@ void Calc_RPA_Eigen_HF() {
 
   PrintOut();
 }
-void Calc_RPA_Eigen_HF_old() {
-  // -- AO basis --
-  CalcSTVMat(basis1, basis1, &S1, &T1, &V1);
-  B2EInt eri_J_11 = CalcERI(basis1, basis1, basis0, basis0, eri_method);
-  B2EInt eri_K_11 = CalcERI(basis1, basis0, basis0, basis1, eri_method);
-  BMat K1; Copy(S1, K1); K1.SetZero();
-  AddK(eri_K_11, c0, 0, 1.0, K1);
-  BMat H_IVO_1;
-  CalcSTEXHamiltonian(T1, V1, 0, c0, eri_J_11, eri_K_11, &H_IVO_1);
 
-  // -- HF0 --
-  BMat U_HF_0;
-  int n00 = basis0->size_basis_isym(0);
-  U_HF_0(0, 0) = MatrixXcd::Zero(n00, n00);
-  U_HF_0(0, 0).col(0) = c0;
+// ==== propagator ====
+void Calc_AB_HF(SymGTOs g, BMat *U, BMat *A, BMat *B) {
+
+  BMat S, T, V;
+  CalcSTVMat(g, g, &S, &T, &V);  
+  B2EInt eri_J = CalcERI(g, g, basis0, basis0, eri_method);
+  B2EInt eri_K = CalcERI(g, basis0, basis0, g, eri_method);
+  BMat K; Copy(S, K); K.SetZero(); AddK(eri_K, c0, 0, 1.0, K);  
+  BMat H_IVO; CalcSTEXHamiltonian(T, V, 0, c0, eri_J, eri_K, &H_IVO);
   
   // -- HF --
-  BMat H_HF_1;
-  CalcFock(T1, V1, 0, c0, eri_J_11, eri_K_11, &H_HF_1);
-  BMat U_HF_1;
-  BVec eig_HF_1;
-  BMatEigenSolve(H_HF_1, S1, &U_HF_1, &eig_HF_1);
-     
-  // -- dipole (AO,HF0) --
-  Irrep x = sym->irrep_x();
-  Irrep y = sym->irrep_y();
-  Irrep z = sym->irrep_z();
-  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, s1_ao, sD1_ao;
-  CalcDipMat(basis1, basis0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
-  s1_ao(x,0) = X1i(x,0); sD1_ao(x,0) = DX1i(x,0);
-  s1_ao(y,0) = Y1i(y,0); sD1_ao(y,0) = DY1i(y,0);
-  s1_ao(z,0) = Z1i(z,0); sD1_ao(z,0) = DZ1i(z,0);
-  BMat s1_HF, sD1_HF;
-  BMatCtAD(U_HF_1, U_HF_0, s1_ao, &s1_HF);
-  BMatCtAD(U_HF_1, U_HF_0, sD1_ao, &sD1_HF);
+  BMat H_HF; CalcFock(T, V, 0, c0, eri_J, eri_K, &H_HF);  
+  BVec eig_HF; BMatEigenSolve(H_HF, S, U, &eig_HF);
 
-  // --dipole (RPA) --
+  // -- A, B (HF basis) --
+  BMatCtAC(*U, H_IVO, A); A->Shift(-E0);
+  BMatCtAC(*U, K, B);
+
+}
+void CalcDipMat(SymGTOs g1, SymGTOs g0, const BMat& U1, const BMat U0, BMat *r, BMat *d) {
+  Irrep x = sym->irrep_x(); Irrep y = sym->irrep_y(); Irrep z = sym->irrep_z();  
+  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, r_ao, d_ao;
+  CalcDipMat(g1, g0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
+  r_ao(x,0) = X1i(x,0); d_ao(x,0) = DX1i(x,0);
+  r_ao(y,0) = Y1i(y,0); d_ao(y,0) = DY1i(y,0);
+  r_ao(z,0) = Z1i(z,0); d_ao(z,0) = DZ1i(z,0);
   
-  // -- RPA --
-  CalcRPA rpa("");
-  rpa.CalcH_HF(H_IVO_1, E0, K1, eig_HF_1, U_HF_1);
-  rpa.SolveEigen();
+  BMatCtAD(U1, U0, r_ao, r);
+  BMatCtAD(U1, U0, d_ao, d);
+}
+void CalcDipMat(SymGTOs g1, SymGTOs g0, const BMat U0, BMat *r, BMat *d) {
+  Irrep x = sym->irrep_x(); Irrep y = sym->irrep_y(); Irrep z = sym->irrep_z();  
+  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i, r_ao, d_ao;
+  CalcDipMat(g1, g0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
+  r_ao(x,0) = X1i(x,0); d_ao(x,0) = DX1i(x,0);
+  r_ao(y,0) = Y1i(y,0); d_ao(y,0) = DY1i(y,0);
+  r_ao(z,0) = Z1i(z,0); d_ao(z,0) = DZ1i(z,0);
 
-  BVec s1_RPA, sD1_RPA;
-  rpa.CalcOneInt(s1_HF,  &s1_RPA, true);
-  rpa.CalcOneInt(sD1_HF, &sD1_RPA, false);
+  Multi(r_ao, U0, *r);
+  Multi(d_ao, U0, *d);
 
-  // check OS --
-  dcomplex os_r, os_d;
-  CalcOStrength(rpa.w, s1_RPA, sD1_RPA, &os_r, &os_d);
-  cout << endl;
-  cout << "oscillator strength" <<endl;
-  cout << os_r << ", " << os_d << endl;
+}
+void CalcPMat(SymGTOs g0, SymGTOs g1, const BMat& U_1, BMat *pe, BMat *pd) {
+  
+  /**
+     Pe_{ba} = (E_{0b}V|e)_a 
+     .       = <Phi_0 | E_{0b}V E_{a0} | Phi_0> 
+     .       = A_{ba} - H^0_{ba}
+     Pd_{ba} = (E_{0b}V|d)_a 
+     .       = <Phi_0 | E_{0a}E_{0b}V  | Phi_0> 
+     .       = K_{ba}
+   */
 
-  // -- w loop --
-  for(int iw = 0; iw < (int)w_list.size(); iw++) {
-    double w = w_list[iw];
-    cout << "w_eV: " << w * au2ev << endl;
-    cout << "w_au: " << w << endl;
-    cout << "E_eV: " << (w + E0) * au2ev << endl;
-    cout << "E_au: " << w + E0 << endl;
-    cout << "k_au: " << sqrt(2.0*(w + E0)) << endl;
-    BOOST_FOREACH(Irrep i, irreps) {
-      muphi_psi1[i] = 0.0;
-      muphi_psi1_v[i] = 0.0;
-      int n = rpa.w(i).size();
-      for(int I = 0; I < n; I++) {
-	dcomplex dl = s1_RPA( i)(I); 
-	dcomplex dv = sD1_RPA(i)(I); 
-	dcomplex wi = rpa.w(i)(I);
-	
-	muphi_psi1[i]   += dl*dl/(w-wi) /3.0*(1.0*ne);
-	muphi_psi1_v[i] += dv*dv/(w-wi) / 3.0 * (1.0*ne);;
+  BMat V1, V0;
+  CalcVMat(g0, mole,  g1, &V1);
+  CalcVMat(g0, mole0, g1, &V0);
+  B2EInt eri_J = CalcERI(g0, g1, basis0, basis0, eri_method);
+  B2EInt eri_K = CalcERI(g0, basis0, basis0, g1, eri_method);
+  BMat K; Copy(V1, K); K.SetZero(); AddK(eri_K, c0, 0, 1.0, K);  
+  V1.Add(-1.0, V0);
+  AddJ(eri_J, c0, irrep0, 1.0, V1);
+  AddK(eri_K, c0, irrep0, 1.0, V1);
+  
+  Multi(V1, U_1, *pe); 
+  Multi(K,  U_1, *pd); 
+  
+}
+void CalcRPAMat(dcomplex w, const BMat& A, const BMat& B, BMat *M) {
+
+  BOOST_FOREACH(Irrep irr, irreps) {
+    int n1 = basis1->size_basis_isym(irr);
+    MatrixXcd& MM = (*M)(irr, irr);
+    const MatrixXcd& AA = A(irr, irr);
+    const MatrixXcd& BB = B(irr, irr);
+    if(MM.rows() != 2*n1 || MM.cols() != 2*n1) {
+      MM = MatrixXcd::Zero(2*n1, 2*n1);
+    }
+    
+    for(int a = 0; a < n1; a++) {
+      for(int b = 0; b < n1; b++) {
+	if(a==b) {
+	  MM(a, b)       = +w -AA(a, b);
+	  MM(a+n1, b+n1) = -w -AA(a, b);
+	} else {
+	  MM(a, b)       = -AA(a, b);
+	  MM(a+n1, b+n1) = -AA(a, b);
+	}
+	MM(a, b+n1) = -BB(a, b);
+	MM(a+n1, b) = -BB(a, b);
       }
     }
-    CalcMain_alpha(iw);
   }
   
 }
+void CalcQVec(const BMat& r, const BMat &d, BVec *qvec_l, BVec *qvec_v) {
 
+  /**
+     calculate [(e_jb|mu), (d_jb|mu)]
+     (e_jb|mu) = +(b|mu|j)
+     (d_jb|mu) = -(j|mu|b)
+
+     Inputs 
+     -------
+     r(a, i) : <a|mu_length|i>
+     d(a, i) : <a|mu_velocity|i>
+   */
+
+  BOOST_FOREACH(Irrep irr, irreps) {
+    int n1 = basis1->size_basis_isym(irr);
+    const MatrixXcd& rr = r(irr, irrep0);
+    const MatrixXcd& dd = d(irr, irrep0);
+    VectorXcd& ll = (*qvec_l)(irr);
+    VectorXcd& vv = (*qvec_v)(irr);
+    if(ll.size() != 2*n1)
+      ll = VectorXcd::Zero(2*n1);
+    if(vv.size() != 2*n1)
+      vv = VectorXcd::Zero(2*n1);
+
+    for(int a = 0; a < n1; a++) {
+      ll(a)    = rr(a);
+      ll(a+n1) = rr(a);
+      vv(a)    = dd(a);
+      vv(a+n1) = -dd(a);
+      /*
+      ll(a)    = rr(a);
+      ll(a+n1) = -rr(a);
+      vv(a)    = dd(a);
+      vv(a+n1) = -(-dd(a));
+      */
+    }
+  }
+  
+}
+void CalcPVec(const BMat& r, const BMat& d, BVec *qvec_r, BVec *qvec_d) {
+  /**
+     calculate [(mu|e_jb), (mu|d_jb)]
+     (mu|e_jb) = (j|mu|b)
+     (mu|d_jb) = -(b|mu|j)
+
+     Inputs 
+     -------
+     r(a, i) : <a|mu_length|i>
+     d(a, i) : <a|mu_velocity|i>
+   */
+
+  BOOST_FOREACH(Irrep irr, irreps) {
+    int n1 = basis1->size_basis_isym(irr);
+    const MatrixXcd& rr = r(irr, irrep0);
+    const MatrixXcd& dd = d(irr, irrep0);
+    VectorXcd& ll = (*qvec_r)(irr);
+    VectorXcd& vv = (*qvec_d)(irr);
+    if(ll.size() != 2*n1)
+      ll = VectorXcd::Zero(2*n1);
+    if(vv.size() != 2*n1)
+      vv = VectorXcd::Zero(2*n1);
+
+    for(int a = 0; a < n1; a++) {
+      /*
+      ll(a)    = rr(a);
+      ll(a+n1) = -rr(a);
+      vv(a)    = dd(a);
+      vv(a+n1) = dd(a);
+      */
+      ll(a)    = rr(a);
+      ll(a+n1) = rr(a);
+      vv(a)    = dd(a);
+      vv(a+n1) = -dd(a);
+    }
+
+  }
+ 
+}
+void CalcPVec(const map<int, BMat>& Pe, const map<int, BMat>& Pd, const map<int, BVec>& C0,
+	      map<int, BVec>* pvec) {
+
+  BOOST_FOREACH(Irrep irr, irreps) {
+    int n1 = basis1->size_basis_isym(irr);
+    BOOST_FOREACH(int L, Ls) {
+      int n0 = basis_psi0_L[L]->size_basis_isym(irr);
+      (*pvec)[L](irr) = VectorXcd::Zero(2*n1);
+      VectorXcd& P = (*pvec)[L](irr);
+      for(int a = 0; a < n1; a++) {
+	for(int p = 0; p < n0; p++) {
+	  P(a)    += C0.at(L)(irr)(p) * Pe.at(L)(irr,irr)(p, a);
+	  P(a+n1) += C0.at(L)(irr)(p) * Pd.at(L)(irr,irr)(p, a);
+	}
+      }
+    }
+  }
+  
+}
+void Calc_Propagator_RPA() {
+  PrintTimeStamp("propagator_RPA", NULL);
+  
+  // ---- Ground State ----
+  int ng = basis0->size_basis_isym(0);
+  BMat U_g;
+  U_g(0, 0) = MatrixXcd::Zero(ng, ng);
+  U_g(0, 0).col(0) = c0;
+
+  // ---- 0 th psi ----  
+  map<int, BMat> S0, T0, V0, r_0g, d_0g, s_0;
+  BOOST_FOREACH(int L, Ls) {
+    SymGTOs g0L = basis_psi0_L[L];
+    CalcSTVMat(basis_psi0_L[L], basis_psi0_L[L], &S0[L], &T0[L], &V0[L]);
+    CalcDipMat(basis_psi0_L[L], basis0,          U_g, &r_0g[L], &d_0g[L]);
+    CalcSMat(basis_psi0_L[L],   basis_chi0_L[L], &s_0[L]);    
+  }
+
+  // ---- 1st psi ----
+  BMat U_HF_1, A_1, B_1, r_1g, d_1g;
+  Calc_AB_HF(basis1, &U_HF_1, &A_1, &B_1);
+  CalcDipMat(basis1, basis0, U_HF_1, U_g, &r_1g, &d_1g);
+  
+  // ---- 0th psi <-> 1st psi (PVec) ----
+  map<int, BMat> Pe, Pd, C_Pe, C_Pd;
+  BOOST_FOREACH(int L, Ls) {
+    CalcPMat(basis_psi0_L[L],   basis1, U_HF_1, &Pe[L],   &Pd[L]);
+    CalcPMat(basis_c_psi0_L[L], basis1, U_HF_1, &C_Pe[L], &C_Pd[L]);
+  }
+
+  // ---- w loop ----
+  PrintTimeStamp("start loop", NULL);
+  for(int iw = 0; iw < (int)w_list.size(); iw++) {
+    dcomplex w = w_list[iw];
+    dcomplex ene = E0+w;
+    PrintWloop(w);
+
+    // -- 1st psi --
+    BMat M; CalcRPAMat(w, A_1, B_1, &M);
+    BVec QVec_l, QVec_v; CalcQVec(r_1g, d_1g, &QVec_l, &QVec_v);
+    BVec PVec_l, PVec_v; CalcPVec(r_1g, d_1g, &PVec_l, &PVec_v);
+    BVec X_l, X_v;
+    BOOST_FOREACH(Irrep irr, irreps) {
+      ColPivHouseholderQR<MatrixXcd> piv = M(irr, irr).colPivHouseholderQr();
+      X_l(irr) = piv.solve(QVec_l(irr)); X_v(irr) = piv.solve(QVec_v(irr));      
+    }
+    
+    // -- 0th psi --
+    map<int, BVec> C0, C_C0;
+    BOOST_FOREACH(Irrep irr, irreps) {
+      BOOST_FOREACH(int L, Ls) {	
+	MatrixXcd L0 =  ene*S0[L](irr,irr) - T0[L](irr,irr) - V0[L](irr,irr);
+	C0[L](irr)   = L0.colPivHouseholderQr().solve(s_0[L](irr,irr).col(0));
+	C_C0[L](irr) = C0[L](irr).conjugate();
+      }
+    }
+
+    // -- 0th <-> 1st --
+    map<int, BVec> PVec, C_PVec;
+    CalcPVec(Pe, Pd, C0, &PVec); CalcPVec(C_Pe, C_Pd, C_C0, &C_PVec);
+
+    for(int im = 0; im < 3; im++) {
+      Irrep irr(irreps[im]); int m(ms_xyz[im]);
+      // -- ground <-> 1st --
+      muphi_psi1[irr]   = TDot(PVec_l(irr), X_l(irr)) / 3.0 * (1.0*ne);
+      muphi_psi1_v[irr] = TDot(PVec_v(irr), X_v(irr)) / 3.0 * (1.0*ne);
+
+      BOOST_FOREACH(int L, Ls) {
+	// -- 0th <-> ground --
+	dcomplex i2(0, 2);
+	impsi0_muphi(L, m)   = TDot(C0[L](irr), r_0g[L](irr, irrep0).col(0)).imag();
+	impsi0_muphi_v(L, m) = TDot(C0[L](irr), d_0g[L](irr, irrep0).col(0)).imag();
+	impsi0_v_psi1(L, m) = (TDot(PVec[L](irr), X_l(irr)) - TDot(C_PVec[L](irr), X_l(irr)))/i2;
+	impsi0_v_psi1_v(L, m) = (TDot(PVec[L](irr), X_v(irr)) - TDot(C_PVec[L](irr), X_v(irr)))/i2;
+	impsi0_chi(L, m) = TDot(C0[L](irr), s_0[L](irr,irr).col(0)).imag();
+      }
+    }    
+    CalcMain_alpha(iw);
+    CalcMain(iw);    
+  }
+  PrintOut();
+}
+void Calc_Propagator_RPA_eigen() {
+  PrintTimeStamp("propagator_RPA_eigen", NULL);
+
+  int ng = basis0->size_basis_isym(0);
+  BMat U_g; U_g(0, 0)=MatrixXcd::Zero(ng,ng); U_g(0,0).col(0) = c0;
+
+  BMat U_HF, A, B, r, d;
+  Calc_AB_HF(basis1, &U_HF, &A, &B);
+  CalcDipMat(basis1, basis0, U_HF, U_g, &r, &d);
+
+  CalcRPA rpa; rpa.A = A; rpa.B = B; rpa.CalcH(); rpa.SolveEigen();
+  BMat Y = rpa.Y;
+  BMat Z = rpa.Z;
+
+  for(int iw = 0; iw < (int)w_list.size(); iw++) {
+    dcomplex w = w_list[iw];
+    PrintWloop(w);
+
+    for(int im = 0; im < 3; im++) {
+      Irrep irr(irreps[im]); 
+      dcomplex acc_l(0), acc_v(0);
+      int nI = rpa.w(irr).size();
+      for(int I = 0; I < nI; I++) {
+	dcomplex wI = rpa.w(irr)(I);
+	dcomplex rYI = TDot(Y(irr,irr).col(I), r(irr,0).col(0));
+	dcomplex rZI = TDot(Z(irr,irr).col(I), r(irr,0).col(0));
+	dcomplex dYI = TDot(Y(irr,irr).col(I), d(irr,0).col(0));
+	dcomplex dZI = TDot(Z(irr,irr).col(I), d(irr,0).col(0));
+	acc_l += (+rYI+rZI)*(+rYI-rZI)/(w-wI) + (+rZI+rYI)*(-rZI+rYI)/(-w-wI);
+	acc_v += (+dYI-dZI)*(+dYI+dZI)/(w-wI) + (+dZI-dYI)*(-dZI-dYI)/(-w-wI);
+      }
+      muphi_psi1[irr]   = acc_l / 3.0 * (1.0*ne);
+      muphi_psi1_v[irr] = acc_v / 3.0 * (1.0*ne);
+    }
+    CalcMain_alpha(iw);
+  }
+  PrintOut();
+}
+void Calc_Propagator_AO() {
+  PrintTimeStamp("Prop_AO", NULL);
+  // ---- Ground State ----
+  int ng = basis0->size_basis_isym(0);
+  BMat U_g;
+  U_g(0, 0) = MatrixXcd::Zero(ng, ng);
+  U_g(0, 0).col(0) = c0;
+
+  // ---- first psi ----
+  BMat S, T, V;
+  CalcSTVMat(basis1, basis1, &S, &T, &V);  
+  B2EInt eri_J = CalcERI(basis1, basis1, basis0, basis0, eri_method);
+  B2EInt eri_K = CalcERI(basis1, basis0, basis0, basis1, eri_method);
+  BMat B; Copy(S, B); B.SetZero(); AddK(eri_K, c0, 0, 1.0, B);  
+  BMat A; CalcSTEXHamiltonian(T, V, 0, c0, eri_J, eri_K, &A);
+  A.Add(-E0, S);
+
+  // ---- dipole -----
+  Irrep x = sym->irrep_x(); Irrep y = sym->irrep_y(); Irrep z = sym->irrep_z();  
+  BVec r, d;
+  BMat X1i, DX1i, Y1i, DY1i, Z1i, DZ1i;  
+  CalcDipMat(basis1, basis0, &X1i, &Y1i, &Z1i, &DX1i, &DY1i, &DZ1i);
+  r(x) = X1i(x,0)*c0; d(x) = DX1i(x,0)*c0;
+  r(y) = Y1i(y,0)*c0; d(y) = DY1i(y,0)*c0;
+  r(z) = Z1i(z,0)*c0; d(z) = DZ1i(z,0)*c0;
+
+  // ---- build matrix ----
+  for(int iw = 0; iw < (int)w_list.size(); iw++) {
+    dcomplex w = w_list[iw];
+  
+    BOOST_FOREACH(Irrep irr, irreps) {
+      int n1 = basis1->size_basis_isym(irr);
+      MatrixXcd M(2*n1, 2*n1);
+      VectorXcd qvec_l(2*n1), qvec_v(2*n1);
+      for(int a = 0; a < n1; a++) {
+	/*
+	qvec_l(a)    = r(irr)(a);
+	qvec_l(a+n1) = -r(irr)(a);
+	qvec_v(a)    = d(irr)(a);
+	qvec_v(a+n1) = d(irr)(a);
+	*/
+	qvec_l(a)    = r(irr)(a);
+	qvec_l(a+n1) = r(irr)(a);
+	qvec_v(a)    = d(irr)(a);
+	qvec_v(a+n1) = -d(irr)(a);
+	for(int b = 0; b < n1; b++) {
+	  M(a, b)       = +w*S(irr,irr)(a,b) - A(irr,irr)(a,b);
+	  M(a+n1, b+n1) = -w*S(irr,irr)(a,b) - A(irr,irr)(a,b);
+	  M(a+n1, b) = -B(irr,irr)(a,b);
+	  M(a, b+n1) = -B(irr,irr)(a,b);
+	}
+      }
+      ColPivHouseholderQR<MatrixXcd> pivx = M.colPivHouseholderQr();
+      VectorXcd xvec_l = pivx.solve(qvec_l);
+      muphi_psi1[irr] = TDot(xvec_l, qvec_l) / 3.0 * (1.0*ne);
+      MatrixXcd xvec_v = pivx.solve(qvec_v)  / 3.0 * (1.0*ne);
+      muphi_psi1_v[irr] = TDot(xvec_v, qvec_v);
+    }
+    CalcMain_alpha(iw);
+  }
+  PrintOut();
+}
 int main(int argc, char *argv[]) {
   cout << ">>>> two_pot >>>>" << endl;
   if(argc == 1) {
@@ -1790,9 +2190,20 @@ int main(int argc, char *argv[]) {
   in_json = argv[1];
   Parse();
   PrintIn();
-
+  if(calc_type == "propagator_ao") {
+    Calc_Propagator_AO();
+    return 0;
+  }
+  if(calc_type == "propagator" and solve_driv_type == "linear_solve") {
+    Calc_Propagator_RPA();
+    return 0;
+  }
+  if(calc_type == "propagator" and solve_driv_type == "eigen_value") {
+    Calc_Propagator_RPA_eigen();
+    return 0;
+  }
   if(calc_type == "RPA" and solve_driv_type == "eigen_value") {
-    Calc_RPA_Eigen_HF();
+    Calc_RPA_HF();
     //Calc_RPA_Eigen_HF_old();
     return 0;
   }

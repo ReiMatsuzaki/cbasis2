@@ -29,11 +29,12 @@ namespace cbasis {
   class CalcRPA {
   public:
     // -- intermediate --
-    BMat A, B;
+    BMat A, B, S;
     BMat ApB, AmB, sqrt_AmB, inv_sqrt_AmB;
     BMat H, U;
     BVec w2;
     // -- final results --
+    bool is_ortho;
     BVec w;
     BMat Y, Z;
     // -- routines --
@@ -41,6 +42,9 @@ namespace cbasis {
     CalcRPA();
     CalcRPA(std::string name);
     void CalcH();
+    void SetS(const BMat& in_S);
+    void CalcH_AO(const BMat& H_IVO_AO, const BMat& S,
+		  dcomplex eig0_HF, const BMat& K);
     void CalcH_HF(const BMat& H_IVO_AO, dcomplex eig0_HF,	    
 		  const BMat& K,
 		  const BVec& eig_HF, const BMat& U_HF);
@@ -51,7 +55,8 @@ namespace cbasis {
     dcomplex CalcYZNorm(Irrep irr, int I);
     void CalcOneInt(const BVec& z_HF, BVec *z_RPA, bool symmetric);
     void CalcOneInt(const BMat& z_HF, BVec *z_RPA, bool symmetric);
-    void CalcOneIntRight(const BMat& x, BMat *y, bool symmetric) const;
+    void CalcOneIntRight(const BMat& x, BMat *y, bool symmetric,
+			 dcomplex cy=1.0, dcomplex cz=1.0) const;
   };
 }
 

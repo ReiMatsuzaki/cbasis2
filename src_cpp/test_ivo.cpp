@@ -24,6 +24,7 @@ public:
   MO mo_0;
   VectorXcd c0;
   dcomplex E0;
+  CalcRPA RPA_AO;
   CalcRPA RPA_HF;
   CalcRPA RPA_IVO;
   BVec de_HF;
@@ -62,6 +63,7 @@ public:
     E0 = mo_0->eigs(0)(0);
     
     // -- basis for excited state --
+    /*
     VectorXcd zs(13);
     zs << dcomplex(0.0812755955262,  -0.0613237786222),
       dcomplex(0.00497147387796, -0.0113737972763),
@@ -74,8 +76,10 @@ public:
       0.970343213756015, 3.045486762417561,
       9.558462911446421,
       29.999872058865982;
-    //zs << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053,
-    //      30.17990, 108.7723;
+    */
+    VectorXcd zs(8);
+    zs << 0.107951, 0.240920, 0.552610, 1.352436, 3.522261, 9.789053,
+          30.17990, 108.7723;
     us_1 = NewSymGTOs(mole);
     us_1->NewSub("He").SolidSH_M(1, 0, zs);
     us_1->NewSub("He").SolidSH_M(1, -1, zs);
@@ -113,6 +117,10 @@ public:
     BMatEigenSolve(H_IVO_AO, S, &U_IVO, &eig_IVO);  
     de_IVO = eig_IVO; de_IVO.set_name("de_IVO");
     de_IVO.Shift(-eig0_HF);
+
+    // -- RPA on AO --
+    RPA_AO.CalcH_AO(H_IVO_AO, S, eig0_HF, K);
+    RPA_AO.SolveEigen();
     
     // -- RPA on HF --    
     RPA_HF.CalcH_HF(H_IVO_AO, eig0_HF, K, eig_HF, U_HF);
@@ -133,9 +141,10 @@ TEST_F(TestIVO, Delta_E) {
   cout << "E0 = " << mo_0->eigs(0)(0).real() << endl;
   cout << "Delta E" << endl;
   for(int I = 0; I < n; I++) {
-    cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+    cout << format("%10.5f, %10.5f, %10.5f, %10.5f, %10.5f\n")
       % de_HF(irr1)(I).real()
       % de_IVO(irr1)(I).real()
+      % RPA_AO.w(irr1)(I).real()
       % RPA_HF.w(irr1)(I).real()
       % RPA_IVO.w(irr1)(I).real();
   }
@@ -147,6 +156,7 @@ TEST_F(TestIVO, Norm) {
   Irrep irr1 = sym->irrep_z();
   int n = us_1->size_basis_isym(irr1);
   for(int i = 0; i < n; i++) {
+    EXPECT_C_EQ(1.0, RPA_AO.CalcYZNorm(irr1, i));
     EXPECT_C_EQ(1.0, RPA_HF.CalcYZNorm(irr1, i));
     EXPECT_C_EQ(1.0, RPA_IVO.CalcYZNorm(irr1, i));
   }
@@ -166,6 +176,8 @@ TEST_F(TestIVO, Moment) {
   BVecCtx(U_HF, zz, &z_HF);
   BVec z_IVO("z_IVO");
   BVecCtx(U_IVO, zz, &z_IVO);
+  BVec z_RPA_AO;
+  RPA_AO.CalcOneInt(zz, &z_RPA_AO, true);
   BVec z_RPA_HF;
   RPA_HF.CalcOneInt(z_HF, &z_RPA_HF, true);
   BVec z_RPA_IVO;
@@ -174,21 +186,26 @@ TEST_F(TestIVO, Moment) {
   // -- print out --  
   int n = us_1->size_basis_isym(irr1);
   for(int I = 0; I < n; I++) {
-    cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+    cout << format("%10.5f, %10.5f, %10.5f, %10.5f, %10.5f\n")
       % z_HF(irr1)(I).real()
       % z_IVO(irr1)(I).real()
+      % z_RPA_AO(irr1)(I).real()
       % z_RPA_HF(irr1)(I).real()
       % z_RPA_IVO(irr1)(I).real();
   }
 
   // -- check sum rule --
   dcomplex acc_HF(0), acc_IVO(0), acc_RPA_HF(0), acc_RPA_IVO(0);
+  dcomplex acc_RPA_AO(0);
   for(int I = 0; I < n; I++) {
     dcomplex ele_z = z_HF(irr1)(I);
     acc_HF += 2.0/3.0 * de_HF(irr1)(I) * ele_z * ele_z;
 
     ele_z = z_IVO(irr1)(I);
     acc_IVO += 2.0/3.0 * de_IVO(irr1)(I) * ele_z * ele_z;
+
+    ele_z = z_RPA_AO(irr1)(I);
+    acc_RPA_AO += 2.0/3.0 * RPA_AO.w(irr1)(I) * ele_z*ele_z;
     
     ele_z = z_RPA_HF(irr1)(I);
     acc_RPA_HF += 2.0/3.0 * RPA_HF.w(irr1)(I) * ele_z * ele_z;
@@ -198,9 +215,10 @@ TEST_F(TestIVO, Moment) {
     
   }
   cout << "sum of oscillator strength" << endl;
-  cout << format("%10.5f, %10.5f, %10.5f, %10.5f\n")
+  cout << format("%10.5f, %10.5f, %10.5f, %10.5f, %10.5f\n")
     % acc_HF.real()
     % acc_IVO.real()
+    % acc_RPA_AO.real()
     % acc_RPA_HF.real()
     % acc_RPA_IVO.real();
 
