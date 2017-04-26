@@ -3,7 +3,7 @@
     "out_json": "out.json",
     "cs_csv" : "cs.csv",
     "calc_type": "propagator",
-    "solve_driv_type": "eigen_value",
+    "solve_driv_type": "linear_solve",
     "num_ele": 2,
     "lmax": 1,
     "Z": 1.0,
