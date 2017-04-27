@@ -1,5 +1,6 @@
 {
     "comment" : "calculation of H2 photoionization under Propagator/RPA",
+    "pad_csv": "pad.csv",
     "out_json": "out.json",
     "cs_csv" : "cs.csv",
     "calc_type": "propagator",

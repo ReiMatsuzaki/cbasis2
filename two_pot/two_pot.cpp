@@ -37,7 +37,7 @@ string in_json, out_json, cs_csv;
 object obj;
 
 // -- Output --
-ofstream f_para;
+ofstream f_pad;
 
 // -- target --
 SymmetryGroup sym;
@@ -255,16 +255,6 @@ void Parse() {
     obj = json.get<object>();
     comment = ReadJson<string>(obj, "comment");
     calc_type = ReadJson<string>(obj, "calc_type");
-
-    // -- write coeff for molecule fixed with parallel electronic field --
-    string para_csv = ReadJsonWithDefault<string>(obj, "para_csv", "");
-    cout << "para_csv: " << para_csv << endl;
-    if(para_csv != "") {
-      f_para.open(para_csv.c_str());
-      if(f_para.fail()) {
-	throw runtime_error("failed to open file.");
-      }
-    }
     
     // -- write wave function --    
     if(obj.find("write_psi") != obj.end())  {
@@ -327,6 +317,25 @@ void Parse() {
     impsi0_v_psi1.SetRange(Ls[0], Ls[Ls.size()-1], -1,1);
     impsi0_v_psi1_v.SetRange(Ls[0], Ls[Ls.size()-1], -1,1);
     impsi0_chi.SetRange(   Ls[0], Ls[Ls.size()-1], -1,1);
+
+    // -- write coeff for molecule fixed electronic field --
+    string pad_csv = ReadJsonWithDefault<string>(obj, "pad_csv", "");
+    cout << "pad_csv: " << pad_csv << endl;
+    if(pad_csv != "") {
+      cout << 1 << endl;
+      f_pad.open(pad_csv.c_str(), ios::out);
+      cout << 2 << endl;
+      if(f_pad.fail()) {
+	throw runtime_error("failed to open file.");
+      }
+      int lmax = 2*Ls[Ls.size()-1];
+      f_pad << "w";
+      for(int M = 0; M <= 1; M++)
+	for(int L = 0; L <= lmax; L++)
+	  f_pad << format(",C_l_%d_%d") % L % M;
+      f_pad << endl;
+    }
+
 
     cout << "mole" << endl;
     mole0 = NewMolecule(sym);
@@ -887,35 +896,28 @@ void CalcMain(int iw) {
   double coeff =  4.0*M_PI*M_PI / (c_light*w) * 1.0/(4.0*M_PI) * au2mb;
   cout << format("coef: %20.10f\n") % coeff;
   int lmax = 2*Ls[Ls.size()-1];
-  if(f_para.is_open()) {
-    f_para << "w";
-    for(int L = 0; L <= lmax; L++) {
-      f_para << format(",%d") % L;
-    }
-    f_para << ",cs_sigu\n";
-  }
 
+  if(f_pad.is_open())
+    f_pad << format("%10.5f") % w;
   for(int M = 0; M <= 1; M++) {
     cout << format("Coef(M=%d) = \n") % M;
     for(int L = 0; L <= lmax; L++) {      
       double c_l = Coef_FixedMole(w, Alm,   Ls, L, M)      *coeff;
       double c_v = Coef_FixedMole(w, Alm_v, Ls, L, M)/(w*w)*coeff;
       cout << format("%d: %20.10f, %20.10f\n") % L % c_l % c_v; 
-      if(f_para.is_open()) {
-	f_para << format(",%20.10f") % c;
-      }
-    }
-    
+      if(f_pad.is_open())
+	f_pad << format(",%20.10f,%20.10f") % c_l % c_v;
+    }    
     double c0_l = Coef_FixedMole(w, Alm,   Ls, 0, M)       * coeff * 4.0*M_PI/3.0;
     double c0_v = Coef_FixedMole(w, Alm_v, Ls, 0, M)/(w*w) * coeff * 4.0*M_PI/3.0;
     if(M==1) {
       c0_l *= 2.0; c0_v *= 2.0;
     }
     cout << format("Cs(M=%d,fixed): %20.10f, %20.10f\n") % M % c0_l % c0_v;
-    if(f_para.is_open()) {
-      f_para << format(",%20.10f\n") % c0;
-    }
   }
+  if(f_pad.is_open())
+    f_pad << endl;
+
 }
 void PrintOut() {
 
@@ -958,6 +960,8 @@ void PrintOut() {
     }
   }
 }
+
+
 void Calc_one_lin() {
   PrintTimeStamp("Calc_one_lin", NULL);
   PrintTimeStamp("CalcMat", NULL);
